@@ -10,15 +10,14 @@
 (define testState '((x y z) (1 3 5)))
 
 ; ((x y z) (1 3 5)) -> ((a x y z) (13 1 3 5))
-(define insert
-  (lambda (name value state)
-    (cons (cons name (car state))
-          (cons (cons value (car (cdr state))) '() ) )) )
-
 (define update
    (lambda (name value state)
      (insert name value (removeItem name state))))
 
+(define insert
+  (lambda (name value state)
+    (cons (cons name (car state))
+          (cons (cons value (car (cdr state))) '() ) )) )
   
 (define removeItem
   (lambda (name state)
