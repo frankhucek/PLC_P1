@@ -1,3 +1,5 @@
+; Frank Hucek, Joseph Volpe, Robert Milne
+
 ; State definition
 ; '(() ())
 ; ((x y z) (1 3 5))
@@ -34,7 +36,3 @@
       ((eq? name (caar state)) (caadr state))
       (else (lookup name (cons (cdar state)
                                (cons (cdr (car (cdr state))) '())))))))
-
-
-
-  
