@@ -25,22 +25,26 @@
 
 (define execute-statement ; M_statement
   (lambda (statement state)
-    ((eq? 'var (operator statement)) (execute-declaration statement state))
-    ((eq? '= (operator statement)) (execute-assignment statement state))
-    ((eq? 'return (operator statement)) (execute-return statement state))
-    ((eq? 'if (operator statement)) (execute-conditional statement state))
-    ((eq? 'while (operator statement)) (execute-while statement state))
-    (else (execute-boolean-statement statement state))))
+    (cond
+      ((eq? 'var (operator statement)) (execute-declaration statement state))
+      ((eq? '= (operator statement)) (execute-assignment statement state))
+      ((eq? 'return (operator statement)) (execute-return statement state))
+      ((eq? 'if (operator statement)) (execute-conditional statement state))
+      ((eq? 'while (operator statement)) (execute-while statement state))
+      (else (execute-boolean-statement statement state)))))
 
 (define execute-declaration
   (lambda (statement state)
-    (if (null? (operand2 statement))
-        (insert state (operand1 statement) null)
-        (insert state (operand1 statement) (execute-value-statement (operand2 statement) state)))))
+    (cond
+      ((and (contains (operand1 statement) state)
+            (null? (operand2 statement))) (update (operand1 statement) null state))
+      ((contains (operand1 statement) state) (update (operand1 statement) (execute-value-statement (operand2 statement) state) state))
+      ((null? (operand2 statement)) (insert (operand1 statement) null state))
+      (else (insert (operand1 statement) (execute-value-statement (operand2 statement) state) state)))))
 
 (define execute-assignment
   (lambda (statement state)
-    (update state (operand1 statement) (execute-value-statement (operand2 statement) state))))
+    (update (operand1 statement) (execute-value-statement (operand2 statement) state) state)))
 
 (define execute-return
   (lambda (statement state)
@@ -78,6 +82,7 @@
   (lambda (statement state)
     (cond
       ((null? statement) statement)
+      ((boolean? statement) statement) ;boolean
       ((number? statement) statement) ;number 
       ((atom? statement) (lookup statement state)) ;variable
       ;should be a list, therefore a value statement with an operator and operands
@@ -87,10 +92,10 @@
                                         (execute-value-statement (operand2 statement) state)))
       ((eq? '* (operator statement)) (* (execute-value-statement (operand1 statement) state)
                                         (execute-value-statement (operand2 statement) state)))
-      ((eq? '/ (operator statement)) (/ (execute-value-statement (operand1 statement) state)
-                                        (execute-value-statement (operand2 statement) state)))
-      ((eq? '% (operator statement)) (% (execute-value-statement (operand1 statement) state)
-                                        (execute-value-statement (operand2 statement) state))))))
+      ((eq? '/ (operator statement)) (quotient (execute-value-statement (operand1 statement) state)
+                                               (execute-value-statement (operand2 statement) state)))
+      ((eq? '% (operator statement)) (remainder (execute-value-statement (operand1 statement) state)
+                                                (execute-value-statement (operand2 statement) state))))))
     
 
 

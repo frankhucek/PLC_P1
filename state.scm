@@ -35,3 +35,11 @@
       ((eq? name (caar state)) (caadr state))
       (else (lookup name (cons (cdar state)
                                (cons (cdr (car (cdr state))) '())))))))
+
+(define contains
+  (lambda (name state)
+    (cond
+      ((null? (car state)) #f)
+      ((eq? name (caar state)) #t)
+      (else (contains name (cons (cdar state)
+                                 (cons (cdr (cadr state)) '())))))))
