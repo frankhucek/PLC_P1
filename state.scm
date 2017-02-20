@@ -6,7 +6,7 @@
 ; x->1, y->3
 ; lookup x and y
 
-(define newState '(() ()) )
+(define newState (lambda () '(() ()) ))
 (define testState '((x y z) (1 3 5)))
 
 ; ((x y z) (1 3 5)) -> ((a x y z) (13 1 3 5))

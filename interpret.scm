@@ -10,7 +10,7 @@
 
 (define interpret
   (lambda (filename)
-    (interpret-parse-tree (parser filename) newState) ))
+    (interpret-parse-tree (parser filename) (newState)) ))
 
 (define interpret-parse-tree
   (lambda (parsetree state)
