@@ -7,7 +7,6 @@
 ; lookup x and y
 
 (define newState (lambda () '(() ()) ))
-(define testState '((x y z) (1 3 5)))
 
 ; ((x y z) (1 3 5)) -> ((a x y z) (13 1 3 5))
 (define update
@@ -18,7 +17,7 @@
   (lambda (name value state)
     (cons (cons name (car state))
           (cons (cons value (car (cdr state))) '() ) )) )
-  
+
 (define removeItem
   (lambda (name state)
     (cond
