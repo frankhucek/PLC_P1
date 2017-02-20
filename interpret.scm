@@ -49,8 +49,7 @@
   (lambda (statement state)
     (cond
       ((boolean? (execute-return* statement state)) (convertSchemeBoolean (execute-return* statement state)) )
-      (else
-       (execute-return* statement state))) ))
+      (else (execute-return* statement state))) ))
       
 (define execute-return*
   (lambda (statement state)
@@ -59,14 +58,9 @@
 (define execute-conditional
   (lambda (statement state)
     (cond
-      ((null? (operand3 statement))
-       (cond
-         ((execute-boolean-statement (operand1 statement) state) (execute-statement (operand2 statement) state))
-         (else state)))
-      (else
-       (if (execute-boolean-statement (operand1 statement) state) ;boolean condition 
-           (execute-statement (operand2 statement) state)      ;if true
-           (execute-statement (operand3 statement) state))))))   ;else false
+      ((execute-boolean-statement (operand1 statement) state) (execute-statement (operand2 statement) state)) ;if true
+      ((null? (operand3 statement)) state) ;false but no else block
+      (else (execute-statement (operand3 statement) state))))) ;false and else block to execute
 
 (define execute-while
   (lambda (statement state)
