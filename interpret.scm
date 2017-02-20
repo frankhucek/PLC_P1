@@ -36,9 +36,7 @@
 (define execute-declaration
   (lambda (statement state)
     (cond
-      ((and (contains (operand1 statement) state)
-            (null? (operand2 statement))) (update (operand1 statement) null state))
-      ((contains (operand1 statement) state) (update (operand1 statement) (execute-value-statement (operand2 statement) state) state))
+      ((contains (operand1 statement) state) error "No redefining variables")
       ((null? (operand2 statement)) (insert (operand1 statement) null state))
       (else (insert (operand1 statement) (execute-value-statement (operand2 statement) state) state)))))
 
@@ -48,17 +46,29 @@
 
 (define execute-return
   (lambda (statement state)
-    (execute-value-statement (operand1 statement) state)))
+    ((boolean? (execute-return* statement state)) (convertSchemeBoolean (execute-return* statement state)))
+    (else (execute-return* statement state))))
+      
+(define execute-return*
+  (lambda (statement state)
+    (execute-boolean-statement (operand1 statement) state)))
 
 (define execute-conditional
   (lambda (statement state)
-    (if (execute-boolean-statement (operand1 statement) state) ;boolean condition 
-        (execute-statement (operand2 statement) state)      ;if true
-        (execute-statement (operand3 statement) state))))   ;else false
-
+    (cond
+      ((null? (operand3 statement))
+       (cond
+         ((execute-boolean-statement (operand1 statement) state) (execute-statement (operand2 statement) state))
+         (else state)))
+      (else
+       (if (execute-boolean-statement (operand1 statement) state) ;boolean condition 
+           (execute-statement (operand2 statement) state)      ;if true
+           (execute-statement (operand3 statement) state))))))   ;else false
+       
 (define execute-boolean-statement
   (lambda (statement state)
     (cond
+      ((atom? statement) (execute-value-statement statement state))
       ((eq? '== (operator statement)) (= (execute-value-statement (operand1 statement) state)
                                          (execute-value-statement (operand2 statement) state)))
       ((eq? '!= (operator statement)) (not (= (execute-value-statement (operand1 statement) state)
@@ -82,31 +92,40 @@
   (lambda (statement state)
     (cond
       ((null? statement) statement)
-      ((boolean? statement) statement) ;boolean
+      ((isABooleanWord? statement) (convertBooleanWord statement))
       ((number? statement) statement) ;number 
       ((atom? statement) (lookup statement state)) ;variable
       ;should be a list, therefore a value statement with an operator and operands
       ((eq? '+ (operator statement)) (+ (execute-value-statement (operand1 statement) state)
                                         (execute-value-statement (operand2 statement) state)))
-      ((eq? '- (operator statement)) (- (execute-value-statement (operand1 statement) state)
-                                        (execute-value-statement (operand2 statement) state)))
+      ((eq? '- (operator statement)) (handle-unary-sign statement state))
       ((eq? '* (operator statement)) (* (execute-value-statement (operand1 statement) state)
                                         (execute-value-statement (operand2 statement) state)))
       ((eq? '/ (operator statement)) (quotient (execute-value-statement (operand1 statement) state)
                                                (execute-value-statement (operand2 statement) state)))
       ((eq? '% (operator statement)) (remainder (execute-value-statement (operand1 statement) state)
                                                 (execute-value-statement (operand2 statement) state))))))
-    
 
+(define handle-unary-sign
+  (lambda (statement state)
+    (cond
+      ((null? (operand2 statement)) (* -1 (execute-value-statement (operand1 statement) state)))
+      (else (- (execute-value-statement (operand1 statement) state)
+               (execute-value-statement (operand2 statement) state))))))
 
+(define isABooleanWord?
+  (lambda (statement)
+    (or (eq? statement 'true) (eq? statement 'false))))
 
+(define convertBooleanWord
+  (lambda (statement)
+    (cond
+      ((eq? statement 'true) #t)
+      ((eq? statement 'false) #f)
+      (else error "not a boolean"))))
 
-
-
-
-  
-                                     
-
-
+(define convertSchemeBoolean
+  (lambda (statement)
+    (if statement 'true 'false)))
 
     
