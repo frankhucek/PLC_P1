@@ -38,7 +38,8 @@
     (cond
       ((contains (operand1 statement) state) error "No redefining variables")
       ((null? (operand2 statement)) (insert (operand1 statement) null state))
-      (else (insert (operand1 statement) (execute-value-statement (operand2 statement) state) state)))))
+      (else (insert (operand1 statement) (execute-boolean-statement (operand2 statement) state) state)))))
+                                          ; changed exec-bool from exec-val
 
 (define execute-assignment
   (lambda (statement state)
@@ -66,7 +67,13 @@
        (if (execute-boolean-statement (operand1 statement) state) ;boolean condition 
            (execute-statement (operand2 statement) state)      ;if true
            (execute-statement (operand3 statement) state))))))   ;else false
-       
+
+(define execute-while
+  (lambda (statement state)
+    (cond
+      ((execute-boolean-statement (operand1 statement) state) (execute-while statement (execute-statement (operand2 statement) state)) )
+      (else state) )))
+
 (define execute-boolean-statement
   (lambda (statement state)
     (cond
