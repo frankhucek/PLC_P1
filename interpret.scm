@@ -46,8 +46,10 @@
 
 (define execute-return
   (lambda (statement state)
-    ((boolean? (execute-return* statement state)) (convertSchemeBoolean (execute-return* statement state)))
-    (else (execute-return* statement state))))
+    (cond
+      ((boolean? (execute-return* statement state)) (convertSchemeBoolean (execute-return* statement state)) )
+      (else
+       (execute-return* statement state))) ))
       
 (define execute-return*
   (lambda (statement state)
