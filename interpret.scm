@@ -71,7 +71,7 @@
 (define execute-while
   (lambda (statement state)
     (cond
-      ((execute-boolean-statement (operand1 statement) state) (execute-while statement (execute-statement (operand2 statement) state)) )
+      ((execute-boolean-statement (operand1 statement) state) (execute-while statement (execute-statement (operand2 statement) state)) ) ; apply new state to next iteration
       (else state) )))
 
 (define execute-boolean-statement
