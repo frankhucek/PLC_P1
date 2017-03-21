@@ -99,6 +99,8 @@
       ((number? statement) statement) ;number 
       ((atom? statement) (lookup statement state)) ;variable
       ;should be a list, therefore a value statement with an operator and operands
+      ((null? (execute-value-statement (operand1 statement) state)) error "Variable one is not defined") ;checks to see if operand one has a value
+      ((null? (execute-value-statement (operand2 statement) state)) error "Variable two is not defined") ;checks operand two
       ((eq? '+ (operator statement)) (+ (execute-value-statement (operand1 statement) state)
                                         (execute-value-statement (operand2 statement) state)))
       ((eq? '- (operator statement)) (handle-unary-sign statement state))
