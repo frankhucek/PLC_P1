@@ -14,16 +14,16 @@
 (define valuesAfterTheFirst (lambda (state) (if (null? (assignedValues state)) null (cdr (assignedValues state)))))
   
 ; ((x y z) (1 3 5)) -> ((a x y z) (13 1 3 5))
-(define update
+(define updateState
    (lambda (name value state)
      (insert name value (removeItem name state))))
 
-(define insert
+(define insertToState
   (lambda (name value state)
     (cons (cons name (variables state))
           (cons (cons value (assignedValues state)) '() ) )) )
 
-(define removeItem
+(define removeItemFromState
   (lambda (name state)
     (cond
       ((null? (variables state)) (error "variable not in state"))
@@ -32,7 +32,7 @@
       (else (insert (caar state) (caadr state) (removeItem name (cons (cdar state)
                                (cons (valuesAfterTheFirst state) '()))))))))
 
-(define lookup
+(define lookupInState
   (lambda (name state)
     (cond
       ((null? (variables state)) (error "variable not in state"))
@@ -40,7 +40,7 @@
       (else (lookup name (cons (cdar state)
                                (cons (valuesAfterTheFirst state) '())))))))
 
-(define contains
+(define containsInState
   (lambda (name state)
     (cond
       ((null? (variables state)) #f)

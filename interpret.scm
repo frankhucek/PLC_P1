@@ -1,6 +1,6 @@
 ; Frank Hucek, Joseph Volpe, Robert Milne
 (load "simpleParser.scm")
-(load "state.scm")
+(load "stack.scm")
 
 ; atom?
 ; returns whether or not the given param is an atom
