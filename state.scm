@@ -10,8 +10,8 @@
 (define variables (lambda (state) (if (null? state) null (car state))))
 (define assignedValues (lambda (state) (if (null? (cdr state)) null (car (cdr state)))))
 (define firstVariable (lambda (state) (if (null? (variables state)) null (caar state))))
-(define variablesAfterTheFirst (lambda (state) (if (null? (variables state)) null (cdr (assignedValue state)))))
-(define valuesAfterTheFirst (lambda (state) (if (null? (assignedValues state)) null (cdr (assignedValue state)))))
+(define variablesAfterTheFirst (lambda (state) (if (null? (variables state)) null (cdr (assignedValues state)))))
+(define valuesAfterTheFirst (lambda (state) (if (null? (assignedValues state)) null (cdr (assignedValues state)))))
   
 ; ((x y z) (1 3 5)) -> ((a x y z) (13 1 3 5))
 (define update

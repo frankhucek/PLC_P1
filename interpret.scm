@@ -36,7 +36,7 @@
 (define execute-declaration
   (lambda (statement state)
     (cond
-      ((contains (operand1 statement) state) error "No redefining variables")
+      ((contains (operand1 statement) state) (error "No redefining variables"))
       ((null? (operand2 statement)) (insert (operand1 statement) null state))
       (else (insert (operand1 statement) (execute-boolean-statement (operand2 statement) state) state)))))
                                           ; changed exec-bool from exec-val
@@ -99,11 +99,12 @@
       ((number? statement) statement) ;number 
       ((atom? statement) (lookup statement state)) ;variable
       ;should be a list, therefore a value statement with an operator and operands
-      ((null? (execute-value-statement (operand1 statement) state)) error "Variable one is not defined") ;checks to see if operand one has a value
-      ((null? (execute-value-statement (operand2 statement) state)) error "Variable two is not defined") ;checks operand two
+      ((null? (execute-value-statement (operand1 statement) state)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
+      ((eq? '- (operator statement)) (handle-unary-sign statement state))
+      ((null? (execute-value-statement (operand2 statement) state)) (error "Variable two is not assigned")) ;checks operand two
       ((eq? '+ (operator statement)) (+ (execute-value-statement (operand1 statement) state)
                                         (execute-value-statement (operand2 statement) state)))
-      ((eq? '- (operator statement)) (handle-unary-sign statement state))
+      
       ((eq? '* (operator statement)) (* (execute-value-statement (operand1 statement) state)
                                         (execute-value-statement (operand2 statement) state)))
       ((eq? '/ (operator statement)) (quotient (execute-value-statement (operand1 statement) state)
@@ -115,6 +116,7 @@
   (lambda (statement state)
     (cond
       ((null? (operand2 statement)) (* -1 (execute-value-statement (operand1 statement) state)))
+      ((null? (execute-value-statement (operand2 statement) state)) (error "Variable two is not assigned"))
       (else (- (execute-value-statement (operand1 statement) state)
                (execute-value-statement (operand2 statement) state))))))
 
