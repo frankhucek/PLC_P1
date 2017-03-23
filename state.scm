@@ -16,7 +16,7 @@
 ; ((x y z) (1 3 5)) -> ((a x y z) (13 1 3 5))
 (define updateState
    (lambda (name value state)
-     (insert name value (removeItem name state))))
+     (insertToState name value (removeItemFromState name state))))
 
 (define insertToState
   (lambda (name value state)
@@ -28,8 +28,8 @@
     (cond
       ((null? (variables state)) (error "variable not in state"))
       ((eq? name (firstVariable state)) (cons (cdar state)
-                               (cons (valuesAfterTheFirst state) '())))
-      (else (insert (caar state) (caadr state) (removeItem name (cons (cdar state)
+                                              (cons (valuesAfterTheFirst state) '())))
+      (else (insertToState (caar state) (caadr state) (removeItemFromState name (cons (cdar state)
                                (cons (valuesAfterTheFirst state) '()))))))))
 
 (define lookupInState
@@ -37,7 +37,7 @@
     (cond
       ((null? (variables state)) (error "variable not in state"))
       ((eq? name (caar state)) (caadr state))
-      (else (lookup name (cons (cdar state)
+      (else (lookupInState name (cons (cdar state)
                                (cons (valuesAfterTheFirst state) '())))))))
 
 (define containsInState
@@ -45,5 +45,5 @@
     (cond
       ((null? (variables state)) #f)
       ((eq? name (caar state)) #t)
-      (else (contains name (cons (cdar state)
+      (else (containsInState name (cons (cdar state)
                                  (cons (cdr (cadr state)) '())))))))
