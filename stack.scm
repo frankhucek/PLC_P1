@@ -4,9 +4,11 @@
 (define newStack (lambda () '((() ())) ))
 (define testStack '(((a b) (1 2)) ((x y) (3 4))) )
 
+(define addLayer (lambda (operand1 operand2) (cons operand1 operand2)))
+
 (define push
   (lambda (stack)
-    (cons '(() ()) stack) ))
+    (addLayer '(() ()) stack) ))
          
 (define pop
   (lambda (stack)
@@ -20,21 +22,21 @@
 (define update
   (lambda (name value stack)
     (cond
-      ((containsInState name (pop stack)) (cons (updateState name value (pop stack)) (removeTopLayer stack)))
-      (else (cons (pop stack) (update name value (removeTopLayer stack)))) )))
+      ((containsInState name (pop stack)) (addLayer (updateState name value (pop stack)) (removeTopLayer stack)))
+      (else (addLayer (pop stack) (update name value (removeTopLayer stack)))) )))
 
 ;insert
 (define insert
   (lambda (name value stack)
-    (cons (insertToState name value (pop stack)) (removeTopLayer stack)) ))
+    (addLayer (insertToState name value (pop stack)) (removeTopLayer stack)) ))
      
 ;removeItem
 (define removeItem
   (lambda (name stack)
     (cond
       ((null? stack) (error "variable not in stack"))
-      ((containsInState name (pop stack)) (cons (removeItemFromState name (pop stack)) (removeTopLayer stack)))
-      (else (cons (pop stack) (removeItem name (removeTopLayer stack)))) )))                                    
+      ((containsInState name (pop stack)) (addLayer (removeItemFromState name (pop stack)) (removeTopLayer stack)))
+      (else (addLayer (pop stack) (removeItem name (removeTopLayer stack)))) )))                                    
       
 ;lookup
 (define lookup
