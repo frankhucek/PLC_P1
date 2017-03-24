@@ -34,8 +34,8 @@
 (define execute-statement ; M_statement
   (lambda (statement state exit break cont throw)
     (cond
-      ((eq? 'begin (operator statement))    (execute-begin (rest-of-statements statement) (push state) exit break cont throw))
-      ((eq? 'break (operator statement))    (break (removeTopLayer state)))
+      ((eq? 'begin (operator statement))    (execute-begin (rest-of-statements statement) (pushEmptyState state) exit break cont throw))
+      ((eq? 'break (operator statement))    (break (pop state)))
       ((eq? 'continue (operator statement)) (cont state))
       ((eq? 'try (operator statement))      (execute-try-block (rest-of-statements statement) state exit break cont throw))
       ((eq? 'catch (operator statement))    (execute-catch-block (rest-of-statements statement) statement state exit break cont throw))
@@ -50,7 +50,7 @@
 (define execute-begin
   (lambda (statement state exit break cont throw)
     (cond
-      ((null? statement) (removeTopLayer state))
+      ((null? statement) (pop state))
       (else (execute-begin (rest-of-statements statement) (execute-statement (first-statement statement) state exit break cont throw) exit break cont throw)) )))
 
 (define execute-try-block
@@ -62,19 +62,19 @@
 (define execute-try-block-without-finally
   (lambda (statement state exit break cont throw)
     (call/cc (lambda (valid-throw)
-               (removeTopLayer (execute-begin (operator1 statement) (push state) exit break cont
+               (pop (execute-begin (operator1 statement) (pushEmptyState state) exit break cont
                                               (lambda (v1 v2) (valid-throw (execute-catch-block v1 (operand2 statement) v2 exit break cont throw)))))))))
 
 (define execute-try-block-with-finally
   (lambda (statement state exit break cont throw)
     (call/cc (lambda (valid-throw)
                (execute-begin (operand3 statement)
-                              (removeTopLayer (execute-begin (operator1 statement) (push state) exit break cont
+                              (pop (execute-begin (operator1 statement) (pushEmptyState state) exit break cont
                                                              (lambda (v1 v2) (valid-throw (excute-begin (operand3 statement) (execute-catch-block v1 (operand2 statement) v2 exit break cont throw)))))))))))
 
 (define execute-catch-block
   (lambda (statement state exit break cont throw)
-    (removeTopLayer (execute-begin statement exit break cont throw)) ))
+    (pop (execute-begin statement exit break cont throw)) ))
      
 (define execute-declaration
   (lambda (statement state)
