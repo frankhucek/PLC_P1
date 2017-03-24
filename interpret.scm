@@ -47,7 +47,7 @@
   (lambda (statement state exit break cont throw)
     (cond
       ((null? statement) (removeTopLayer state))
-      (else (execute-begin (cdr statement) (execute-statement (car statement) state exit break cont throw) exit break cont)) )))
+      (else (execute-begin (cdr statement) (execute-statement (car statement) state exit break cont throw) exit break cont throw)) )))
 
 ;(((= x 20) (if (< x 0) (throw 10)) (= x (+ x 5))) (catch (e) ((= x e))) (finally ((= x (+ x 100)))))
 
