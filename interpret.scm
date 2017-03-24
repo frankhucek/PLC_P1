@@ -6,50 +6,52 @@
 (define operand1 (lambda (statement) (if (null? (cdr statement)) null (car (cdr statement))) ))
 (define operand2 (lambda (statement) (if (null? (cdr (cdr statement))) null (car (cdr (cdr statement)))) ))
 (define operand3 (lambda (statement) (if (null? (cdr (cdr (cdr statement)))) null (car (cdr (cdr (cdr statement))))) ))
+(define first-statement (lambda (list-of-statements) (car list-of-statements)))
+(define rest-of-statements (lambda (list-of-statements) (cdr list-of-statements)))
 
 (define invalid-break (lambda (v) (error "can only break in while")))
 (define invalid-continue (lambda (v) (error "can only continue in a while")))
 (define invalid-throw (lambda (v1 v2) (error "can only throw in a try")))
 
-; atom?
-; returns whether or not the given param is an atom
+; atom? returns whether or not the given param is an atom
 (define atom?
   (lambda (x)
     (and (not (pair? x)) (not (null? x)))))
 
 (define interpret
   (lambda (filename)
-    (call/cc (lambda (exit) (interpret-parse-tree (parser filename) (newStack) exit invalid-break invalid-continue invalid-throw))) ))
+    (call/cc
+     (lambda (exit)
+       (interpret-parse-tree (parser filename) (newStack) exit invalid-break invalid-continue invalid-throw))) ))
 
 (define interpret-parse-tree
   (lambda (parsetree state exit break cont throw)
     (cond
       ((null? parsetree) state)
-      (else (interpret-parse-tree (cdr parsetree) (execute-statement (car parsetree) state exit break cont throw) exit break cont throw)) )))
+      (else (interpret-parse-tree (rest-of-statements parsetree)
+                                  (execute-statement (first-statement parsetree) state exit break cont throw) exit break cont throw)) )))
 
 (define execute-statement ; M_statement
   (lambda (statement state exit break cont throw)
     (cond
-      ((eq? 'begin (operator statement))  (execute-begin (cdr statement) (push state) exit break cont throw))
-      ((eq? 'break (operator statement))  (break (removeTopLayer state)))
+      ((eq? 'begin (operator statement))    (execute-begin (rest-of-statements statement) (push state) exit break cont throw))
+      ((eq? 'break (operator statement))    (break (removeTopLayer state)))
       ((eq? 'continue (operator statement)) (cont state))
-      ((eq? 'try (operator statement))    (execute-try-block (cdr statement) state exit break cont throw))
-      ((eq? 'catch (operator statement))  (execute-catch-block (cdr statement) statement state exit break cont throw))
-      ((eq? 'throw (operator statement))  (throw (value (execute-value-statement (operand1 statement) state)) state))
-      ((eq? 'var (operator statement))    (execute-declaration statement state))
-      ((eq? '= (operator statement))      (execute-assignment statement state))
-      ((eq? 'return (operator statement)) (exit (execute-return statement state)))
-      ((eq? 'if (operator statement))     (execute-conditional statement state exit break cont throw))
-      ((eq? 'while (operator statement))  (execute-while statement state exit throw))
-      (else (execute-boolean-statement statement state)))))
+      ((eq? 'try (operator statement))      (execute-try-block (rest-of-statements statement) state exit break cont throw))
+      ((eq? 'catch (operator statement))    (execute-catch-block (rest-of-statements statement) statement state exit break cont throw))
+      ((eq? 'throw (operator statement))    (throw (value (execute-value-statement (operand1 statement) state)) state))
+      ((eq? 'var (operator statement))      (execute-declaration statement state))
+      ((eq? '= (operator statement))        (execute-assignment statement state))
+      ((eq? 'return (operator statement))   (exit (execute-return statement state)))
+      ((eq? 'if (operator statement))       (execute-conditional statement state exit break cont throw))
+      ((eq? 'while (operator statement))    (execute-while statement state exit throw))
+      (else                                 (execute-boolean-statement statement state)))))
 
 (define execute-begin
   (lambda (statement state exit break cont throw)
     (cond
       ((null? statement) (removeTopLayer state))
-      (else (execute-begin (cdr statement) (execute-statement (car statement) state exit break cont throw) exit break cont throw)) )))
-
-;(((= x 20) (if (< x 0) (throw 10)) (= x (+ x 5))) (catch (e) ((= x e))) (finally ((= x (+ x 100)))))
+      (else (execute-begin (rest-of-statements statement) (execute-statement (first-statement statement) state exit break cont throw) exit break cont throw)) )))
 
 (define execute-try-block
   (lambda (statement state exit break cont throw)
@@ -57,7 +59,6 @@
       ((null? (operand3 statement)) execute-try-block-without-finally statement state exit throw)
       (else execute-try-block-with-finally statement state exit throw) )))
   
-
 (define execute-try-block-without-finally
   (lambda (statement state exit break cont throw)
     (call/cc (lambda (valid-throw)
@@ -142,12 +143,12 @@
     (cond
       ((null? statement) statement)
       ((isABooleanWord? statement) (convertBooleanWord statement))
-      ((number? statement) statement) ;number 
-      ((atom? statement) (lookup statement state)) ;variable
+      ((number? statement) statement)  
+      ((atom? statement) (lookup statement state)) 
       ;should be a list, therefore a value statement with an operator and operands
       ((null? (execute-value-statement (operand1 statement) state)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
-      ((eq? '- (operator statement)) (handle-unary-sign statement state))
-      ((null? (execute-value-statement (operand2 statement) state)) (error "Variable two is not assigned")) ;checks operand two
+      ((eq? '- (operator statement)) (handle-unary-sign statement state)) ;handles the case where there might be negative sign
+      ((null? (execute-value-statement (operand2 statement) state)) (error "Variable two is not assigned")) ;checks operand two for below operations
       ((eq? '+ (operator statement)) (+ (execute-value-statement (operand1 statement) state)
                                         (execute-value-statement (operand2 statement) state)))
       
@@ -175,7 +176,7 @@
     (cond
       ((eq? statement 'true) #t)
       ((eq? statement 'false) #f)
-      (else error "not a boolean"))))
+      (else (error "not a boolean")))))
 
 (define convertSchemeBoolean
   (lambda (statement)
