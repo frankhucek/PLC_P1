@@ -25,147 +25,146 @@
        (interpret-parse-tree (parser filename) (newStack) exit invalid-break invalid-continue invalid-throw))) ))
 
 (define interpret-parse-tree
-  (lambda (parsetree state exit break cont throw)
+  (lambda (parsetree stack exit break cont throw)
     (cond
-      ((null? parsetree) state)
+      ((null? parsetree) stack)
       (else (interpret-parse-tree (rest-of-statements parsetree)
-                                  (execute-statement (first-statement parsetree) state exit break cont throw) exit break cont throw)) )))
+                                  (execute-statement (first-statement parsetree) stack exit break cont throw) exit break cont throw)) )))
 
 (define execute-statement ; M_statement
-  (lambda (statement state exit break cont throw)
+  (lambda (statement stack exit break cont throw)
     (cond
-      ((eq? 'begin (operator statement))    (execute-begin (rest-of-statements statement) (pushEmptyState state) exit break cont throw))
-      ((eq? 'break (operator statement))    (break (pop state)))
-      ((eq? 'continue (operator statement)) (cont state))
-      ((eq? 'try (operator statement))      (execute-try-block (rest-of-statements statement) state exit break cont throw))
-      ((eq? 'catch (operator statement))    (execute-catch-block (rest-of-statements statement) statement state exit break cont throw))
-      ((eq? 'throw (operator statement))    (throw (value (execute-value-statement (operand1 statement) state)) state))
-      ((eq? 'var (operator statement))      (execute-declaration statement state))
-      ((eq? '= (operator statement))        (execute-assignment statement state))
-      ((eq? 'return (operator statement))   (exit (execute-return statement state)))
-      ((eq? 'if (operator statement))       (execute-conditional statement state exit break cont throw))
-      ((eq? 'while (operator statement))    (execute-while statement state exit throw))
-      (else                                 (execute-boolean-statement statement state)))))
+      ((eq? 'begin (operator statement))    (execute-begin (rest-of-statements statement) (pushEmptyState stack) exit break cont throw))
+      ((eq? 'break (operator statement))    (break (pop stack)))
+      ((eq? 'continue (operator statement)) (cont stack))
+      ((eq? 'try (operator statement))      (execute-try-block (rest-of-statements statement) stack exit break cont throw))
+      ((eq? 'catch (operator statement))    (execute-catch-block (rest-of-statements statement) statement stack exit break cont throw))
+      ((eq? 'throw (operator statement))    (throw (value (execute-value-statement (operand1 statement) stack)) stack))
+      ((eq? 'var (operator statement))      (execute-declaration statement stack))
+      ((eq? '= (operator statement))        (execute-assignment statement stack))
+      ((eq? 'return (operator statement))   (exit (execute-return statement stack)))
+      ((eq? 'if (operator statement))       (execute-conditional statement stack exit break cont throw))
+      ((eq? 'while (operator statement))    (execute-while statement stack exit throw))
+      (else                                 (execute-boolean-statement statement stack)))))
 
 (define execute-begin
-  (lambda (statement state exit break cont throw)
+  (lambda (statement stack exit break cont throw)
     (cond
-      ((null? statement) (pop state))
-      (else (execute-begin (rest-of-statements statement) (execute-statement (first-statement statement) state exit break cont throw) exit break cont throw)) )))
+      ((null? statement) (pop stack))
+      (else (execute-begin (rest-of-statements statement) (execute-statement (first-statement statement) stack exit break cont throw) exit break cont throw)) )))
 
 (define execute-try-block
-  (lambda (statement state exit break cont throw)
+  (lambda (statement stack exit break cont throw)
     (cond
-      ((null? (operand3 statement)) execute-try-block-without-finally statement state exit throw)
-      (else execute-try-block-with-finally statement state exit throw) )))
+      ((null? (operand3 statement)) execute-try-block-without-finally statement stack exit throw)
+      (else execute-try-block-with-finally statement stack exit throw) )))
   
 (define execute-try-block-without-finally
-  (lambda (statement state exit break cont throw)
+  (lambda (statement stack exit break cont throw)
     (call/cc (lambda (valid-throw)
-               (pop (execute-begin (operator1 statement) (pushEmptyState state) exit break cont
+               (pop (execute-begin (operator1 statement) (pushEmptyState stack) exit break cont
                                               (lambda (v1 v2) (valid-throw (execute-catch-block v1 (operand2 statement) v2 exit break cont throw)))))))))
 
 (define execute-try-block-with-finally
-  (lambda (statement state exit break cont throw)
+  (lambda (statement stack exit break cont throw)
     (call/cc (lambda (valid-throw)
                (execute-begin (operand3 statement)
-                              (pop (execute-begin (operator1 statement) (pushEmptyState state) exit break cont
+                              (pop (execute-begin (operator1 statement) (pushEmptyState stack) exit break cont
                                                              (lambda (v1 v2) (valid-throw (excute-begin (operand3 statement) (execute-catch-block v1 (operand2 statement) v2 exit break cont throw)))))))))))
 
 (define execute-catch-block
-  (lambda (statement state exit break cont throw)
+  (lambda (statement stack exit break cont throw)
     (pop (execute-begin statement exit break cont throw)) ))
      
 (define execute-declaration
-  (lambda (statement state)
+  (lambda (statement stack)
     (cond
-      ((contains (operand1 statement) state) (error "No redefining variables"))
-      ((null? (operand2 statement)) (insert (operand1 statement) null state))
-      (else (insert (operand1 statement) (execute-boolean-statement (operand2 statement) state) state)))))
+      ((contains (operand1 statement) stack) (error "No redefining variables"))
+      ((null? (operand2 statement)) (insert (operand1 statement) null stack))
+      (else (insert (operand1 statement) (execute-boolean-statement (operand2 statement) stack) stack)))))
                                           ; changed exec-bool from exec-val
 
 (define execute-assignment
-  (lambda (statement state)
-    (update (operand1 statement) (execute-value-statement (operand2 statement) state) state)))
+  (lambda (statement stack)
+    (update (operand1 statement) (execute-value-statement (operand2 statement) stack) stack)))
 
 (define execute-return
-  (lambda (statement state)
+  (lambda (statement stack)
     (cond
-      ((boolean? (execute-return* statement state)) (convertSchemeBoolean (execute-return* statement state)) )
-      (else (execute-return* statement state))) ))
+      ((boolean? (execute-return* statement stack)) (convertSchemeBoolean (execute-return* statement stack)) )
+      (else (execute-return* statement stack))) ))
       
 (define execute-return*
-  (lambda (statement state)
-    (execute-boolean-statement (operand1 statement) state)))
+  (lambda (statement stack)
+    (execute-boolean-statement (operand1 statement) stack)))
 
 (define execute-conditional
-  (lambda (statement state exit break cont throw)
+  (lambda (statement stack exit break cont throw)
     (cond
-      ((execute-boolean-statement (operand1 statement) state) (execute-statement (operand2 statement) state exit break cont throw)) ;if true
-      ((null? (operand3 statement)) state) ;false but no else block
-      (else (execute-statement (operand3 statement) state exit break cont throw))))) ;false and else block to execute
+      ((execute-boolean-statement (operand1 statement) stack) (execute-statement (operand2 statement) stack exit break cont throw)) ;if true
+      ((null? (operand3 statement)) stack) ;false but no else block
+      (else (execute-statement (operand3 statement) stack exit break cont throw))))) ;false and else block to execute
 
 (define execute-while
-  (lambda (statement state exit throw)
+  (lambda (statement stack exit throw)
     (call/cc (lambda (break)
-               (letrec ((loop (lambda (conditional block state)
-                                 (if (execute-boolean-statement conditional state)
+               (letrec ((loop (lambda (conditional block stack)
+                                 (if (execute-boolean-statement conditional stack)
                                      (loop conditional block
-                                           (call/cc (lambda (cont) (execute-statement block state exit break cont throw))))
-                                     state))))
-               (loop (operand1 statement) (operand2 statement) state)))) ))
+                                           (call/cc (lambda (cont) (execute-statement block stack exit break cont throw))))
+                                     stack))))
+               (loop (operand1 statement) (operand2 statement) stack)))) ))
 
 (define execute-boolean-statement
-  (lambda (statement state)
+  (lambda (statement stack)
     (cond
-      ((atom? statement) (execute-value-statement statement state))
-      ((eq? '== (operator statement)) (= (execute-value-statement (operand1 statement) state)
-                                         (execute-value-statement (operand2 statement) state)))
-      ((eq? '!= (operator statement)) (not (= (execute-value-statement (operand1 statement) state)
-                                              (execute-value-statement (operand2 statement) state))))
-      ((eq? '< (operator statement)) (< (execute-value-statement (operand1 statement) state)
-                                        (execute-value-statement (operand2 statement) state)))
-      ((eq? '> (operator statement)) (> (execute-value-statement (operand1 statement) state)
-                                        (execute-value-statement (operand2 statement) state)))
-      ((eq? '<= (operator statement)) (<= (execute-value-statement (operand1 statement) state)
-                                          (execute-value-statement (operand2 statement) state)))
-      ((eq? '>= (operator statement)) (>= (execute-value-statement (operand1 statement) state)
-                                          (execute-value-statement (operand2 statement) state)))
-      ((eq? '&& (operator statement)) (and (execute-boolean-statement (operand1 statement) state)
-                                           (execute-boolean-statement (operand2 statement) state)))
-      ((eq? '|| (operator statement)) (or (execute-boolean-statement (operand1 statement) state)
-                                          (execute-boolean-statement (operand2 statement) state)))
-      ((eq? '! (operator statement)) (not (execute-boolean-statement (operand1 statement) state)))
+      ((atom? statement) (execute-value-statement statement stack))
+      ((eq? '== (operator statement)) (= (execute-value-statement (operand1 statement) stack)
+                                         (execute-value-statement (operand2 statement) stack)))
+      ((eq? '!= (operator statement)) (not (= (execute-value-statement (operand1 statement) stack)
+                                              (execute-value-statement (operand2 statement) stack))))
+      ((eq? '< (operator statement)) (< (execute-value-statement (operand1 statement) stack)
+                                        (execute-value-statement (operand2 statement) stack)))
+      ((eq? '> (operator statement)) (> (execute-value-statement (operand1 statement) stack)
+                                        (execute-value-statement (operand2 statement) stack)))
+      ((eq? '<= (operator statement)) (<= (execute-value-statement (operand1 statement) stack)
+                                          (execute-value-statement (operand2 statement) stack)))
+      ((eq? '>= (operator statement)) (>= (execute-value-statement (operand1 statement) stack)
+                                          (execute-value-statement (operand2 statement) stack)))
+      ((eq? '&& (operator statement)) (and (execute-boolean-statement (operand1 statement) stack)
+                                           (execute-boolean-statement (operand2 statement) stack)))
+      ((eq? '|| (operator statement)) (or (execute-boolean-statement (operand1 statement) stack)
+                                          (execute-boolean-statement (operand2 statement) stack)))
+      ((eq? '! (operator statement)) (not (execute-boolean-statement (operand1 statement) stack)))
       (else (execute-value-statement statement state)))))
 
 (define execute-value-statement
-  (lambda (statement state)
+  (lambda (statement stack)
     (cond
       ((null? statement) statement)
       ((isABooleanWord? statement) (convertBooleanWord statement))
       ((number? statement) statement)  
-      ((atom? statement) (lookup statement state)) 
+      ((atom? statement) (lookup statement stack)) 
       ;should be a list, therefore a value statement with an operator and operands
-      ((null? (execute-value-statement (operand1 statement) state)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
-      ((eq? '- (operator statement)) (handle-unary-sign statement state)) ;handles the case where there might be negative sign
-      ((null? (execute-value-statement (operand2 statement) state)) (error "Variable two is not assigned")) ;checks operand two for below operations
-      ((eq? '+ (operator statement)) (+ (execute-value-statement (operand1 statement) state)
-                                        (execute-value-statement (operand2 statement) state)))
-      
-      ((eq? '* (operator statement)) (* (execute-value-statement (operand1 statement) state)
-                                        (execute-value-statement (operand2 statement) state)))
-      ((eq? '/ (operator statement)) (quotient (execute-value-statement (operand1 statement) state)
-                                               (execute-value-statement (operand2 statement) state)))
-      ((eq? '% (operator statement)) (remainder (execute-value-statement (operand1 statement) state)
-                                                (execute-value-statement (operand2 statement) state))))))
+      ((null? (execute-value-statement (operand1 statement) stack)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
+      ((eq? '- (operator statement)) (handle-unary-sign statement stack)) ;handles the case where there might be negative sign
+      ((null? (execute-value-statement (operand2 statement) stack)) (error "Variable two is not assigned")) ;checks operand two for below operations
+      ((eq? '+ (operator statement)) (+ (execute-value-statement (operand1 statement) stack)
+                                        (execute-value-statement (operand2 statement) stack)))
+      ((eq? '* (operator statement)) (* (execute-value-statement (operand1 statement) stack)
+                                        (execute-value-statement (operand2 statement) stack)))
+      ((eq? '/ (operator statement)) (quotient (execute-value-statement (operand1 statement) stack)
+                                               (execute-value-statement (operand2 statement) stack)))
+      ((eq? '% (operator statement)) (remainder (execute-value-statement (operand1 statement) stack)
+                                                (execute-value-statement (operand2 statement) stack))))))
 
 (define handle-unary-sign
-  (lambda (statement state)
+  (lambda (statement stack)
     (cond
-      ((null? (operand2 statement)) (* -1 (execute-value-statement (operand1 statement) state)))
-      ((null? (execute-value-statement (operand2 statement) state)) (error "Variable two is not assigned"))
-      (else (- (execute-value-statement (operand1 statement) state)
-               (execute-value-statement (operand2 statement) state))))))
+      ((null? (operand2 statement)) (* -1 (execute-value-statement (operand1 statement) stack)))
+      ((null? (execute-value-statement (operand2 statement) stack)) (error "Variable two is not assigned"))
+      (else (- (execute-value-statement (operand1 statement) stack)
+               (execute-value-statement (operand2 statement) stack))))))
 
 (define isABooleanWord?
   (lambda (statement)
