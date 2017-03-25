@@ -13,6 +13,7 @@
 (define catch-statements (lambda (statement) (car (cdr (cdr statement)))))
 (define catch-value-caught (lambda (statement) (car (operand1 statement))))
 (define finally-block (lambda (statement) (if (null? (cdr (cdr statement))) null (car (cdr (cdr statement)))) ))
+(define finally-statements (lambda (statement) (if (null? (cdr (cdr statement))) null (cadr (car (cdr (cdr statement))))) ))
 (define throw-value (lambda (statement) (if (null? (cdr statement)) null (car (cdr statement))) ))
 (define invalid-break (lambda (v) (error "can only break in while")))
 (define invalid-continue (lambda (v) (error "can only continue in a while")))
@@ -44,7 +45,6 @@
       ((eq? 'break (operator statement))    (break (pop stack)))
       ((eq? 'continue (operator statement)) (cont stack))
       ((eq? 'try (operator statement))      (execute-try-block (rest-of-statements statement) stack exit break cont throw))
-      ((eq? 'catch (operator statement))    (execute-catch-block (rest-of-statements statement) statement stack exit break cont throw))
       ((eq? 'throw (operator statement))    (throw (execute-value-statement (throw-value statement) stack) stack))
       ((eq? 'var (operator statement))      (execute-declaration statement stack))
       ((eq? '= (operator statement))        (execute-assignment statement stack))
@@ -79,9 +79,10 @@
   (lambda (statement stack exit break cont throw)
     (call/cc
      (lambda (valid-throw)
-               (execute-begin (finally-block (rest-of-statements statement))
+               (execute-begin (finally-statements statement)
                               (pushEmptyState (execute-begin (try-block statement) (pushEmptyState stack) exit break cont
-                                                             (lambda (v1 v2) (valid-throw (excute-begin (finally-block (rest-of-statements statement)) (execute-catch-block v1 (catch-block (rest-of-statements statement)) v2 exit break cont throw))))
+                                                             (lambda (throw-value passed-stack) (valid-throw (execute-begin (finally-statements statement)
+                                                                                                                            (pushEmptyState (execute-catch-block throw-value (catch-block (rest-of-statements statement)) passed-stack exit break cont throw))))
                                                              )) exit break cont throw)))))
 
 (define execute-catch-block
