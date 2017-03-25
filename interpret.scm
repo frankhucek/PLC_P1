@@ -37,13 +37,12 @@
       (else (interpret-parse-tree (rest-of-statements parsetree)
                                   (execute-statement (first-statement parsetree) stack exit break cont throw) exit break cont throw)) )))
 
-
 (define execute-statement ; M_statement
   (lambda (statement stack exit break cont throw)
     (cond
       ((eq? 'begin (operator statement))    (execute-begin (rest-of-statements statement) (pushEmptyState stack) exit break cont throw))
       ((eq? 'break (operator statement))    (break (pop stack)))
-      ((eq? 'continue (operator statement)) (cont stack))
+      ((eq? 'continue (operator statement)) (cont (pop stack)))
       ((eq? 'try (operator statement))      (execute-try-block (rest-of-statements statement) stack exit break cont throw))
       ((eq? 'throw (operator statement))    (throw (execute-value-statement (throw-value statement) stack) stack))
       ((eq? 'var (operator statement))      (execute-declaration statement stack))
@@ -82,13 +81,14 @@
                (execute-begin (finally-statements statement)
                               (pushEmptyState (execute-begin (try-block statement) (pushEmptyState stack) exit break cont
                                                              (lambda (throw-value passed-stack) (valid-throw (execute-begin (finally-statements statement)
-                                                                                                                            (pushEmptyState (execute-catch-block throw-value (catch-block (rest-of-statements statement)) passed-stack exit break cont throw))))
-                                                             )) exit break cont throw)))))
+                                                                                                                            (pushEmptyState (execute-catch-block throw-value (catch-block statement) passed-stack exit break cont throw))
+                                                                                                                            exit break cont throw))
+                                                             ))) exit break cont throw)))))
 
 (define execute-catch-block
   (lambda (thrown-val statement stack exit break cont throw)
-    (execute-begin (catch-statements statement) (insert (catch-value-caught statement) thrown-val (pushEmptyState stack)) exit break cont throw)) )
-     
+    (pop (execute-begin (catch-statements statement) (insert (catch-value-caught statement) thrown-val (pushEmptyState stack)) exit break cont throw)) ))
+
 (define execute-declaration
   (lambda (statement stack)
     (cond
