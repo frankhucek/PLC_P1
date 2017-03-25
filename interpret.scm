@@ -8,6 +8,9 @@
 (define operand3 (lambda (statement) (if (null? (cdr (cdr (cdr statement)))) null (car (cdr (cdr (cdr statement))))) ))
 (define first-statement (lambda (list-of-statements) (car list-of-statements)))
 (define rest-of-statements (lambda (list-of-statements) (cdr list-of-statements)))
+(define try-block (lambda (statement) (if (null? statement) null (car statement))))
+(define catch-block (lambda (statement) (if (null? (cdr statement)) null (car (cdr statement))) ))
+(define finally-block (lambda (statement) (if (null? (cdr (cdr statement))) null (car (cdr (cdr statement)))) ))
 
 (define invalid-break (lambda (v) (error "can only break in while")))
 (define invalid-continue (lambda (v) (error "can only continue in a while")))
@@ -31,6 +34,7 @@
       (else (interpret-parse-tree (rest-of-statements parsetree)
                                   (execute-statement (first-statement parsetree) stack exit break cont throw) exit break cont throw)) )))
 
+
 (define execute-statement ; M_statement
   (lambda (statement stack exit break cont throw)
     (cond
@@ -47,6 +51,12 @@
       ((eq? 'while (operator statement))    (execute-while statement stack exit throw))
       (else                                 (execute-boolean-statement statement stack)))))
 
+;(
+; ((= x 20) (if (< x 0) (throw 10)) (= x (+ x 5)))
+; (catch (e) ((= x e)))
+; (finally ((= x (+ x 100))))
+;)
+
 (define execute-begin
   (lambda (statement stack exit break cont throw)
     (cond
@@ -56,21 +66,24 @@
 (define execute-try-block
   (lambda (statement stack exit break cont throw)
     (cond
-      ((null? (operand3 statement)) execute-try-block-without-finally statement stack exit throw)
-      (else execute-try-block-with-finally statement stack exit throw) )))
+      ((null? (finally-block statement)) (execute-try-block-without-finally statement stack exit break cont throw))
+      (else (execute-try-block-with-finally statement stack exit break cont throw)) )))
   
 (define execute-try-block-without-finally
   (lambda (statement stack exit break cont throw)
-    (call/cc (lambda (valid-throw)
-               (pop (execute-begin (operator1 statement) (pushEmptyState stack) exit break cont
-                                              (lambda (v1 v2) (valid-throw (execute-catch-block v1 (operand2 statement) v2 exit break cont throw)))))))))
+    (call/cc
+     (lambda (valid-throw)
+               (execute-begin (try-block statement) (pushEmptyState stack) exit break cont
+                                              (lambda (v1 v2) (valid-throw (execute-catch-block v1 (catch-block (rest-of-statements statement)) v2 exit break cont throw))))))))
 
 (define execute-try-block-with-finally
   (lambda (statement stack exit break cont throw)
-    (call/cc (lambda (valid-throw)
-               (execute-begin (operand3 statement)
-                              (pop (execute-begin (operator1 statement) (pushEmptyState stack) exit break cont
-                                                             (lambda (v1 v2) (valid-throw (excute-begin (operand3 statement) (execute-catch-block v1 (operand2 statement) v2 exit break cont throw)))))))))))
+    (call/cc
+     (lambda (valid-throw)
+               (execute-begin (finally-block (rest-of-statements statement))
+                              (pop (execute-begin (try-block statement) (pushEmptyState stack) exit break cont
+                                                             (lambda (v1 v2) (valid-throw (excute-begin (finally-block (rest-of-statements statement)) (execute-catch-block v1 (catch-block (rest-of-statements statement)) v2 exit break cont throw))))
+                                                             )) exit break cont throw)))))
 
 (define execute-catch-block
   (lambda (statement stack exit break cont throw)
@@ -136,7 +149,7 @@
       ((eq? '|| (operator statement)) (or (execute-boolean-statement (operand1 statement) stack)
                                           (execute-boolean-statement (operand2 statement) stack)))
       ((eq? '! (operator statement)) (not (execute-boolean-statement (operand1 statement) stack)))
-      (else (execute-value-statement statement state)))))
+      (else (execute-value-statement statement stack)))))
 
 (define execute-value-statement
   (lambda (statement stack)
