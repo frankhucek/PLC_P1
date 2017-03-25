@@ -10,6 +10,8 @@
 (define rest-of-statements (lambda (list-of-statements) (cdr list-of-statements)))
 (define try-block (lambda (statement) (if (null? statement) null (car statement))))
 (define catch-block (lambda (statement) (if (null? (cdr statement)) null (car (cdr statement))) ))
+(define catch-statements (lambda (statement) (car (cdr (cdr statement)))))
+(define catch-value-caught (lambda (statement) (car (operand1 statement))))
 (define finally-block (lambda (statement) (if (null? (cdr (cdr statement))) null (car (cdr (cdr statement)))) ))
 (define throw-value (lambda (statement) (if (null? (cdr statement)) null (car (cdr statement))) ))
 (define invalid-break (lambda (v) (error "can only break in while")))
@@ -51,11 +53,7 @@
       ((eq? 'while (operator statement))    (execute-while statement stack exit throw))
       (else                                 (execute-boolean-statement statement stack)))))
 
-;(
-; ((= x 20) (if (< x 0) (throw 10)) (= x (+ x 5)))
-; (catch (e) ((= x e)))
-; (finally ((= x (+ x 100))))
-;)
+;( ((= x 20) (if (< x 0) (throw 10)) (= x (+ x 5))) (catch (e) ((= x e))) (finally ((= x (+ x 100)))) )
 
 ;when calling this in other functions make sure to pass in (pushEmptyState stack)
 (define execute-begin
@@ -88,7 +86,7 @@
 
 (define execute-catch-block
   (lambda (thrown-val statement stack exit break cont throw)
-    (execute-begin (rest-of-statements statement) (pushEmptyState stack) exit break cont throw)) )
+    (execute-begin (catch-statements statement) (insert (catch-value-caught statement) thrown-val (pushEmptyState stack)) exit break cont throw)) )
      
 (define execute-declaration
   (lambda (statement stack)
