@@ -1,0 +1,120 @@
+<html>
+<head>
+<title>EECS 345: Programming Exercise 3</title>
+</head>
+
+<body>
+<h2>EECS 345: Programming Language Concepts</h2>
+<h2>Programming Exercise 3</h2>
+<h2>Due Tuesday, April 18, 2017</h2>
+
+<h3>Part 1: C</h3>
+
+<p>You are to write a program that has the following structures that implement a double linked list:
+
+<ol><li>The <tt>node</tt> structure consists of:
+  <ul><li>an element (you can make this any type, but if you want your list to be general, make it <tt>void *</tt>)</li>
+      <li>a pointer to the next node of the list</li>
+      <li>a pointer to the previous node of the list</li>
+  </ul>
+
+  <li>The <tt>list</tt> structure consists of:
+    <ul><li>a pointer to the first node of the list</li>
+        <li>a pointer to the last node of the list</li>
+    </ul>
+
+</ol>
+
+<p>Create the following functions:
+  <ol><li><tt>add_to_front</tt> takes an element and a list and it adds a new node containing the element to the front of the list</li>
+      <li><tt>add_to_back</tt> takes an element and a list and it adds a new node containing the element to the back of the list</li>
+      <li><tt>remove_from_front</tt> takes a list and removes (and frees) the node that was at the front of the list, and returns the element
+          stored in that node.</li>
+      <li><tt>remove_from_back</tt> takes a list and removes (and frees) the node that was at the back of the list, and returns the element
+          stored in that node.</li>
+      <li><tt>transfer</tt> takes two arrays, and int, and the pointer to two functions.  The arrays will have the same type and length, and the int
+          is the length of the arrays.  The first function pointer points to an insert function and the second points to a remove function.
+	  The function does the following:
+          <ol><li>creates a new empty linked list</li>
+              <li>inserts each element of the first array, in order, into the list, using the insert function parameter</li>
+              <li>until the list is empty, it calls the remove function to remove elements of the list and top place them into the second array, in order</li>
+          </ol>
+      <li>Create a main function that tests your transfer function.  Create two arrays, one filled with appropriate data and the other empty.
+          Call the transfer function on the two arrays and the methods <tt>add_to_front</tt> and <tt>remove_from_front</tt>.  Print the contents
+          of the second array.  If correct, the contents should be reversed.  Repeat this process 3 more times so you can test with all combinations
+          of the add and remove functions.
+       </li>
+   </ol>
+</p>
+
+<h3>Part 2: Haskell Types</h3>
+
+<p>While Haskell is similar to Scheme, Haskell's type rules prevent us from writing a function like the *-functions of the first Scheme homework.
+For example, we can't write the equivalent of <tt>(reverse* '(1 3 (4 ((5) ())) 6))</tt> because a list can't contain both int types and list types as
+elements.</p>
+
+<p>You will fix this.</p>
+
+<p>Step 1:  Create a type that allows us to have nested lists.  Your type should have two kinds of values, elements and sublists.  For example,
+the following will be a valid list:
+<pre>
+[Element 1,Element 3,SubList [Element 4,SubList [SubList [Element 5],SubList []]],Element 6]
+</pre>
+</p>
+
+<p>Step 2: Create the function <tt>flatten</tt> that takes a list as above and returns a list with just the elements.
+<pre>flatten [Element 1,Element 3,SubList [Element 4,SubList [SubList [Element 5],SubList []]],Element 6]
+[Element 1,Element 3,Element 4,Element 5,Element 6]
+</pre></p>
+
+<p>Step 3: Create the function <tt>myreverse</tt> that takes a list as above and returns the list with all elements and sublists reversed.
+<pre>myreverse [Element 1,Element 3,SubList [Element 4,SubList [SubList [Element 5],SubList []]],Element 6]
+[Element 6,SubList [SubList [SubList [],SubList [Element 5]],Element 4],Element 3,Element 1]
+</pre></p>
+
+<p>Optional Extra Challenge: Entering these lists is annoying, so create the function <tt>string2list</tt> that takes a string containing single digits and
+parentheses (possibly spaces or commas) and create a list.
+<pre>
+string2list "1 3 (4 ((5) ())) 6"
+[Element 1,Element 3,SubList [Element 4,SubList [SubList [Element 5],SubList []]],Element 6]
+</pre></p>
+
+<h3>Part 3: Haskell Monads</h3>
+
+<p>Step 1: Using the <tt>Maybe</tt> monad of Haskell, create a function that has the following type:
+<pre>
+yourfunction :: a -> Maybe [a] -> (a -> Bool) -> Maybe [a]
+</pre>
+The function takes a value of some type, a list of the same type (as a monad), and a test function and returns a list (in a monad).
+If the character passes the test, the character is appended to the monad list.  Otherwise the result is <tt>Nothing</tt>.
+</p>
+
+<p>Step 2: Using your above function, create a function <tt>checklist</tt> that takes a list and a function and returns <tt>Nothing</tt> if the
+elements in the list fail to past the function and the list (embedded in a <tt>Maybe</tt>) if all the elements pass.
+<pre>
+checklist "aaaaa" (\x -> x == 'a')
+Just "aaaaa"
+
+checklist "abcde" (\x -> (x >= 'a' && x <= 'z'))
+Just "abcde"
+
+checklist "abcDe" (\x -> (x >= 'a' && x <= 'z'))
+Nothing
+
+checklist [1,-2,3] (\x -> x > 0)
+Nothing
+</pre>
+</p>
+
+<p>Step 3: Create a function <tt>checkappend</tt> that takes two <tt>Maybe</tt> lists and a test function and appends the first list
+to the second only if all characters of the first list pass the test.  The return is <tt>Nothing</tt> if any character of the first
+list does not pass the test.  The second list does not have to pass a test.
+<pre>
+checkappend (Just [1,1,1]) (checkappend (Just [2,3,4]) (Just [8,9]) (\v -> v >= 0)) (\v -> v == 1)
+Just [1,1,1,2,3,4,8,9]
+
+checkappend (Just [1,1,1]) (checkappend (Just [2,3,4]) (Just [8,9]) (\v -> v <= 0)) (\v -> v == 1)
+Nothing
+</pre>
+</body>
+</html>
