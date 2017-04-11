@@ -26,10 +26,12 @@
 
 (define interpret
   (lambda (filename)
-    (call/cc
-     (lambda (exit)
-       (interpret-parse-tree (parser filename) (newStack) exit invalid-break invalid-continue invalid-throw))) ))
-
+    (execute-function-call '(funcall main) (interpret-global-statement filename (newenv)))))
+       
+(define interpret-global-statements
+  (lambda (filename env)
+    (interpret-parse-tree (parser filename) env exit invalid-break invalid-continue invalid-throw)))
+      
 (define interpret-parse-tree
   (lambda (parsetree stack exit break cont throw)
     (cond
@@ -151,24 +153,26 @@
       (else (execute-value-statement statement stack)))))
 
 (define execute-value-statement
-  (lambda (statement stack)
+  (lambda (statement env)
     (cond
       ((null? statement) statement)
       ((isABooleanWord? statement) (convertBooleanWord statement))
       ((number? statement) statement)  
-      ((atom? statement) (lookup statement stack)) 
+      ((atom? statement) (lookup statement env))
+      ((eq? 'function (op stmt)) (interpret_fundef  statement env))
+      ((eq? 'funcall  (op stmt)) (interpret_funcall statement env))
       ;should be a list, therefore a value statement with an operator and operands
-      ((null? (execute-value-statement (operand1 statement) stack)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
-      ((eq? '- (operator statement)) (handle-unary-sign statement stack)) ;handles the case where there might be negative sign
-      ((null? (execute-value-statement (operand2 statement) stack)) (error "Variable two is not assigned")) ;checks operand two for below operations
-      ((eq? '+ (operator statement)) (+ (execute-value-statement (operand1 statement) stack)
-                                        (execute-value-statement (operand2 statement) stack)))
-      ((eq? '* (operator statement)) (* (execute-value-statement (operand1 statement) stack)
-                                        (execute-value-statement (operand2 statement) stack)))
-      ((eq? '/ (operator statement)) (quotient (execute-value-statement (operand1 statement) stack)
-                                               (execute-value-statement (operand2 statement) stack)))
-      ((eq? '% (operator statement)) (remainder (execute-value-statement (operand1 statement) stack)
-                                                (execute-value-statement (operand2 statement) stack))))))
+      ((null? (execute-value-statement (operand1 statement) env)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
+      ((eq? '- (operator statement)) (handle-unary-sign statement env)) ;handles the case where there might be negative sign
+      ((null? (execute-value-statement (operand2 statement) env)) (error "Variable two is not assigned")) ;checks operand two for below operations
+      ((eq? '+ (operator statement)) (+ (execute-value-statement (operand1 statement) env)
+                                        (execute-value-statement (operand2 statement) env)))
+      ((eq? '* (operator statement)) (* (execute-value-statement (operand1 statement) env)
+                                        (execute-value-statement (operand2 statement) env)))
+      ((eq? '/ (operator statement)) (quotient (execute-value-statement (operand1 statement) env)
+                                               (execute-value-statement (operand2 statement) env)))
+      ((eq? '% (operator statement)) (remainder (execute-value-statement (operand1 statement) env)
+                                                (execute-value-statement (operand2 statement) env))))))
 
 (define handle-unary-sign
   (lambda (statement stack)
@@ -191,4 +195,56 @@
 
 (define convertSchemeBoolean
   (lambda (statement)
-    (if statement 'true 'false)))    
+    (if statement 'true 'false)))
+
+; Interprets a function call (e.g. "min(3, 5)").
+(define interpret_funcall (lambda (stmt env)
+    (call/cc (lambda (ret)
+      (interpret_function
+        (cadr (lookup (op1 stmt) env))
+        (set_formal_params
+          (cddr stmt)
+          (car (lookup (op1 stmt) env))
+          env
+          ((caddr (lookup (op1 stmt) env))))
+        ret)
+      ))))
+
+; Interprets a function definition (e.g. "main() {...}").
+(define interpret_fundef (lambda (stmt env)
+    (assign
+      (op1 stmt)
+      (cons (op2 stmt) (cons (op3 stmt) (cons (lambda () env) '())))
+      (declare (op1 stmt) env)
+      )))
+
+(define interpret_function (lambda (stmt env ret)
+    (popframe
+      (interpret_statement_list
+        stmt
+        (pushframe env)
+        ret
+        (lambda (v) (error "Illegal break"))
+        (lambda (v) (error "Illegal continue")))
+        )))
+
+; Sets the formal parameters of the environment to the values in the given parameters.
+(define set_formal_params (lambda (params formals env funcenv)
+    (cond
+      ((and (null? params) (null? formals)) env)
+      ((or  (null? params) (null? formals)) (error "Invalid number of arguments"))
+      ((or (null? (cdr params)) (null? (cdr formals))) (assign
+        (car formals)
+        (interpret_value (car params) env)
+        (declare (car formals) funcenv)))
+      (else (assign
+        (car formals)
+        (interpret_value (car params) env)
+        (declare
+          (car formals)
+          (set_formal_params
+            (cdr params)
+            (cdr formals)
+            env
+            funcenv))))
+      )))
