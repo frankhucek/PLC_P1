@@ -1,6 +1,6 @@
 ; Frank Hucek, Joseph Volpe, Robert Milne
-(load "simpleParser.scm")
-(load "stack.scm")
+(load "functionParser.scm")
+(load "environment.scm")
 
 (define operator (lambda (statement) (if (null? statement) null (car statement))))
 (define operand1 (lambda (statement) (if (null? (cdr statement)) null (car (cdr statement))) ))
@@ -51,8 +51,7 @@
       ((eq? 'if (operator statement))       (execute-conditional statement stack exit break cont throw))
       ((eq? 'while (operator statement))    (execute-while statement stack exit throw))
       (else                                 (execute-boolean-statement statement stack)))))
-
-;( ((= x 20) (if (< x 0) (throw 10)) (= x (+ x 5))) (catch (e) ((= x e))) (finally ((= x (+ x 100)))) )
+      ;checks if operator statement is a function
 
 ;when calling this in other functions make sure to pass in (pushEmptyState stack)
 (define execute-begin
@@ -192,5 +191,4 @@
 
 (define convertSchemeBoolean
   (lambda (statement)
-    (if statement 'true 'false)))
-    
+    (if statement 'true 'false)))    

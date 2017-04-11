@@ -8,37 +8,37 @@
 (define pop (lambda (stack) (cdr stack)))
 
 ;update
-(define update
+(define updateStack
   (lambda (name value stack)
     (cond
       ((containsInState name (peek stack)) (addLayer (updateState name value (peek stack)) (pop stack)))
-      (else (addLayer (peek stack) (update name value (pop stack)))) )))
+      (else (addLayer (peek stack) (updateStack name value (pop stack)))) )))
 
 ;insert
-(define insert
+(define insertToStack
   (lambda (name value stack)
     (addLayer (insertToState name value (peek stack)) (pop stack)) ))
      
 ;removeItem
-(define removeItem
+(define removeItemFromStack
   (lambda (name stack)
     (cond
       ((null? stack) (error "variable not in stack"))
       ((containsInState name (peek stack)) (addLayer (removeItemFromState name (peek stack)) (pop stack)))
-      (else (addLayer (peek stack) (removeItem name (pop stack)))) )))                                    
+      (else (addLayer (peek stack) (removeItemFromStack name (pop stack)))) )))                                    
       
 ;lookup
-(define lookup
+(define lookupInStack
   (lambda (name stack)
     (cond
       ((null? stack) (error "variable not in stack"))
       ((containsInState name (peek stack)) (lookupInState name (peek stack)))
-      (else (lookup name (pop stack))) )))
+      (else (lookupInStack name (pop stack))) )))
 
 ;contains
-(define contains
+(define containsInStack
   (lambda (name stack)
     (cond
       ((null? stack) #f)
       ((containsInState name (peek stack)) #t)
-      (else (contains name (pop stack))) )))
+      (else (containsInStack name (pop stack))) )))
