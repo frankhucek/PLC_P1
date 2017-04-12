@@ -26,7 +26,7 @@
 
 (define interpret
   (lambda (filename)
-    (execute-function-call '(funcall main) (interpret-global-statement filename (newenv)))))
+    (execute-function-call '(funcall main) (interpret-global-statements filename (newenv)))))
        
 (define interpret-global-statements
   (lambda (filename env)
@@ -42,9 +42,9 @@
 (define execute-statement ; M_statement
   (lambda (statement stack exit break cont throw)
     (cond
-      ((eq? 'begin (operator statement))    (execute-begin (rest-of-statements statement) (pushEmptyState stack) exit break cont throw))
-      ((eq? 'break (operator statement))    (break (pop stack)))
-      ((eq? 'continue (operator statement)) (cont (pop stack)))
+      ((eq? 'begin (operator statement))    (execute-begin (rest-of-statements statement) (pushEmptyStateOnTopStack stack) exit break cont throw))
+      ((eq? 'break (operator statement))    (break (popState stack)))
+      ((eq? 'continue (operator statement)) (cont (popState stack)))
       ((eq? 'try (operator statement))      (execute-try-block (rest-of-statements statement) stack exit break cont throw))
       ((eq? 'throw (operator statement))    (throw (execute-value-statement (throw-value statement) stack) stack))
       ((eq? 'var (operator statement))      (execute-declaration statement stack))
@@ -55,11 +55,11 @@
       (else                                 (execute-boolean-statement statement stack)))))
       ;checks if operator statement is a function
 
-;when calling this in other functions make sure to pass in (pushEmptyState stack)
+;when calling this in other functions make sure to pass in (pushEmptyStateOnTopStack stack)
 (define execute-begin
   (lambda (statement stack exit break cont throw)
     (cond
-      ((null? statement) (pop stack))
+      ((null? statement) (popState stack))
       (else (execute-begin (rest-of-statements statement) (execute-statement (first-statement statement) stack exit break cont throw) exit break cont throw)) )))
 
 (define execute-try-block
@@ -72,7 +72,7 @@
   (lambda (statement stack exit break cont throw)
     (call/cc
      (lambda (valid-throw)
-               (execute-begin (try-block statement) (pushEmptyState stack) exit break cont
+               (execute-begin (try-block statement) (pushEmptyStateOnTopStack stack) exit break cont
                                               (lambda (throw-value passed-stack) (valid-throw (execute-catch-block throw-value (catch-block statement) passed-stack exit break cont throw))))))))
 
 (define execute-try-block-with-finally
@@ -80,15 +80,15 @@
     (call/cc
      (lambda (valid-throw)
                (execute-begin (finally-statements statement)
-                              (pushEmptyState (execute-begin (try-block statement) (pushEmptyState stack) exit break cont
+                              (pushEmptyStateOnTopStack (execute-begin (try-block statement) (pushEmptyStateOnTopStack stack) exit break cont
                                                              (lambda (throw-value passed-stack) (valid-throw (execute-begin (finally-statements statement)
-                                                                                                                            (pushEmptyState (execute-catch-block throw-value (catch-block statement) passed-stack exit break cont throw))
+                                                                                                                            (pushEmptyStateOnTopStack (execute-catch-block throw-value (catch-block statement) passed-stack exit break cont throw))
                                                                                                                             exit break cont throw))
                                                              ))) exit break cont throw)))))
 
 (define execute-catch-block
   (lambda (thrown-val statement stack exit break cont throw)
-    (pop (execute-begin (catch-statements statement) (insert (catch-value-caught statement) thrown-val (pushEmptyState stack)) exit break cont throw)) ))
+    (popState (execute-begin (catch-statements statement) (insert (catch-value-caught statement) thrown-val (pushEmptyStateOnTopStack stack)) exit break cont throw)) ))
 
 (define execute-declaration
   (lambda (statement stack)
@@ -159,8 +159,8 @@
       ((isABooleanWord? statement) (convertBooleanWord statement))
       ((number? statement) statement)  
       ((atom? statement) (lookup statement env))
-      ((eq? 'function (op stmt)) (interpret_fundef  statement env))
-      ((eq? 'funcall  (op stmt)) (interpret_funcall statement env))
+      ((eq? 'function (operator statement)) (execute-function-definition  statement env))
+      ((eq? 'funcall  (operator statement)) (execute-function-call statement env))
       ;should be a list, therefore a value statement with an operator and operands
       ((null? (execute-value-statement (operand1 statement) env)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
       ((eq? '- (operator statement)) (handle-unary-sign statement env)) ;handles the case where there might be negative sign
@@ -197,51 +197,49 @@
   (lambda (statement)
     (if statement 'true 'false)))
 
-; Interprets a function call (e.g. "min(3, 5)").
-(define interpret_funcall (lambda (stmt env)
-    (call/cc (lambda (ret)
-      (interpret_function
-        (cadr (lookup (op1 stmt) env))
-        (set_formal_params
-          (cddr stmt)
-          (car (lookup (op1 stmt) env))
-          env
-          ((caddr (lookup (op1 stmt) env))))
-        ret)
-      ))))
+(define functionName (lambda (statement) (operand1 statement)))
+(define functionParameters (lambda (statement) (operand2 statement)))
+(define functionBody (lambda (statement) (operand3 statement)))
 
-; Interprets a function definition (e.g. "main() {...}").
-(define interpret_fundef (lambda (stmt env)
-    (assign
-      (op1 stmt)
-      (cons (op2 stmt) (cons (op3 stmt) (cons (lambda () env) '())))
-      (declare (op1 stmt) env)
-      )))
+(define execute-function-definition
+  (lambda (statement env)
+         (insert (functionName statement)
+                 (cons (functionParameters statement) (cons (functionBody statement) (cons env '())))
+                 env )))
 
-(define interpret_function (lambda (stmt env ret)
-    (popframe
-      (interpret_statement_list
-        stmt
-        (pushframe env)
-        ret
-        (lambda (v) (error "Illegal break"))
-        (lambda (v) (error "Illegal continue")))
-        )))
+(define interpret-function
+  (lambda (statement env exit)
+    (pop (interpret-parse-tree statement env exit invalid-break invalid-continue invalid-throw)) ))
+
+(define execute-function-call
+  (lambda (statement env)
+    (call/cc (lambda (exit)
+               (interpret-function (cadr (lookup (operand1 statement) env))
+                                   (set_formal_params
+                                    (cddr statement) ;parameters your passing in e.g. 1, 2, 3 in foo(1, 2, 3)
+                                    (car (lookup (operand1 statement) env)) ;formal parameters required
+                                    (pushEmptyStack env)
+                                    (caddr (lookup (operand1 statement) env)) ;((lambda () env))
+                                   )
+                                   exit) ))))
+
 
 ; Sets the formal parameters of the environment to the values in the given parameters.
-(define set_formal_params (lambda (params formals env funcenv)
+(define set_formal_params
+  (lambda (params formals env funcenv)
     (cond
       ((and (null? params) (null? formals)) env)
       ((or  (null? params) (null? formals)) (error "Invalid number of arguments"))
-      ((or (null? (cdr params)) (null? (cdr formals))) (assign
+      ((or (null? (cdr params)) (null? (cdr formals))) (update
         (car formals)
-        (interpret_value (car params) env)
-        (declare (car formals) funcenv)))
-      (else (assign
+        (execute-value-statement (car params) env)
+        (insert (car formals) null funcenv)))
+      (else (update
         (car formals)
-        (interpret_value (car params) env)
-        (declare
+        (execute-value-statement (car params) env)
+        (insert
           (car formals)
+          null
           (set_formal_params
             (cdr params)
             (cdr formals)
