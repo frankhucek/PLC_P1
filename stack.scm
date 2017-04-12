@@ -4,41 +4,41 @@
 (define newStack (lambda () '((() ())) ))
 (define addLayer (lambda (layer stack) (cons layer stack)))
 (define pushEmptyState (lambda (stack) (addLayer '(() ()) stack) ))
-(define peek (lambda (stack) (car stack)))
-(define pop (lambda (stack) (cdr stack)))
+(define peekStack (lambda (stack) (car stack)))
+(define popStack (lambda (stack) (cdr stack)))
 
 ;update
 (define updateStack
   (lambda (name value stack)
     (cond
-      ((containsInState name (peek stack)) (addLayer (updateState name value (peek stack)) (pop stack)))
-      (else (addLayer (peek stack) (updateStack name value (pop stack)))) )))
+      ((containsInState name (peekStack stack)) (addLayer (updateState name value (peekStack stack)) (popStack stack)))
+      (else (addLayer (peekStack stack) (updateStack name value (popStack stack)))) )))
 
 ;insert
 (define insertToStack
   (lambda (name value stack)
-    (addLayer (insertToState name value (peek stack)) (pop stack)) ))
+    (addLayer (insertToState name value (peekStack stack)) (popStack stack)) ))
      
 ;removeItem
 (define removeItemFromStack
   (lambda (name stack)
     (cond
       ((null? stack) (error "variable not in stack"))
-      ((containsInState name (peek stack)) (addLayer (removeItemFromState name (peek stack)) (pop stack)))
-      (else (addLayer (peek stack) (removeItemFromStack name (pop stack)))) )))                                    
+      ((containsInState name (peekStack stack)) (addLayer (removeItemFromState name (peekStack stack)) (popStack stack)))
+      (else (addLayer (peekStack stack) (removeItemFromStack name (popStack stack)))) )))                                    
       
 ;lookup
 (define lookupInStack
   (lambda (name stack)
     (cond
       ((null? stack) (error "variable not in stack"))
-      ((containsInState name (peek stack)) (lookupInState name (peek stack)))
-      (else (lookupInStack name (pop stack))) )))
+      ((containsInState name (peekStack stack)) (lookupInState name (peekStack stack)))
+      (else (lookupInStack name (popStack stack))) )))
 
 ;contains
 (define containsInStack
   (lambda (name stack)
     (cond
       ((null? stack) #f)
-      ((containsInState name (peek stack)) #t)
-      (else (containsInStack name (pop stack))) )))
+      ((containsInState name (peekStack stack)) #t)
+      (else (containsInStack name (popStack stack))) )))
