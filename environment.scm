@@ -1,8 +1,6 @@
 ; Frank Hucek, Joseph Volpe, Robert Milne
 (load "stack.scm")
 
-;((((main f) ((() ((return (funcall f 10))) #<procedure:...P1/interpret.scm:207:91>) ((a) ((return (* a a))) #<procedure:...P1/interpret.scm:207:91>)))))
-
 (define testenv (box '( (((a b) (1 2))  ((c d) (3 4)))    (((e f) (5 6))  ((g h) (7 8)))    (((j k) (9 10))) )  ))
 (define newenv (lambda () (box '( ((() ())) )  )))
 (define addStackLayer (lambda (layer env) (begin (set-box! env (cons layer (unbox env))) env)))
