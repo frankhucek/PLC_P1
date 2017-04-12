@@ -14,6 +14,11 @@
 (define catch-value-caught (lambda (statement) (car (operand1 statement))))
 (define finally-block (lambda (statement) (if (null? (cdr (cdr statement))) null (car (cdr (cdr statement)))) ))
 (define finally-statements (lambda (statement) (if (null? (cdr (cdr statement))) null (cadr (car (cdr (cdr statement))))) ))
+(define functionName (lambda (statement) (operand1 statement)))
+(define functionParameters (lambda (statement) (operand2 statement)))
+(define functionBody (lambda (statement) (operand3 statement)))
+(define functionDefinition (lambda (statement) (cadr statement)))
+(define paramsPassingIn (lambda (statement) (cddr statement)))
 (define throw-value (lambda (statement) (if (null? (cdr statement)) null (car (cdr statement))) ))
 (define invalid-break (lambda (v) (error "can only break in while")))
 (define invalid-continue (lambda (v) (error "can only continue in a while")))
@@ -37,7 +42,8 @@
     (cond
       ((null? parsetree) stack)
       (else (interpret-parse-tree (rest-of-statements parsetree)
-                                  (execute-statement (first-statement parsetree) stack exit break cont throw) exit break cont throw)) )))
+                                  (begin (execute-statement (first-statement parsetree) stack exit break cont throw) stack)
+                                  exit break cont throw)) )))
 
 (define execute-statement ; M_statement
   (lambda (statement stack exit break cont throw)
@@ -159,7 +165,7 @@
       ((isABooleanWord? statement) (convertBooleanWord statement))
       ((number? statement) statement)  
       ((atom? statement) (lookup statement env))
-      ((eq? 'function (operator statement)) (execute-function-definition  statement env))
+      ((eq? 'function (operator statement)) (save-function-definition  statement env))
       ((eq? 'funcall  (operator statement)) (execute-function-call statement env))
       ;should be a list, therefore a value statement with an operator and operands
       ((null? (execute-value-statement (operand1 statement) env)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
@@ -197,52 +203,42 @@
   (lambda (statement)
     (if statement 'true 'false)))
 
-(define functionName (lambda (statement) (operand1 statement)))
-(define functionParameters (lambda (statement) (operand2 statement)))
-(define functionBody (lambda (statement) (operand3 statement)))
-
-(define execute-function-definition
+(define save-function-definition
   (lambda (statement env)
          (insert (functionName statement)
-                 (cons (functionParameters statement) (cons (functionBody statement) (cons env '())))
-                 env )))
+                 (cons (functionParameters statement) (cons (functionBody statement) '()))
+                 env)))
 
 (define interpret-function
-  (lambda (statement env exit)
-    (pop (interpret-parse-tree statement env exit invalid-break invalid-continue invalid-throw)) ))
+  (lambda (statement env)
+    (call/cc (lambda (exit)
+               (interpret-parse-tree statement env exit invalid-break invalid-continue invalid-throw) ))))
 
 (define execute-function-call
   (lambda (statement env)
-    (call/cc (lambda (exit)
-               (interpret-function (cadr (lookup (operand1 statement) env))
-                                   (set_formal_params
-                                    (cddr statement) ;parameters your passing in e.g. 1, 2, 3 in foo(1, 2, 3)
-                                    (car (lookup (operand1 statement) env)) ;formal parameters required
-                                    (pushEmptyStack env)
-                                    (caddr (lookup (operand1 statement) env)) ;((lambda () env))
-                                   )
-                                   exit) ))))
+    (let ([return-value (interpret-function (functionDefinition (lookup (functionName statement) env))
+                                   (addStackLayer
+                                    (set-parameters
+                                     (paramsPassingIn statement) ;parameters your passing in e.g. 1, 2, 3 in foo(1, 2, 3)
+                                     (first-statement (lookup (operand1 statement) env)) ;variables the values will be assigned to
+                                     (newStack)
+                                     env
+                                     )
+                                    env))])
+        (pop env)
+        return-value) ))
 
-
-; Sets the formal parameters of the environment to the values in the given parameters.
-(define set_formal_params
-  (lambda (params formals env funcenv)
+(define set-parameters
+  (lambda (values variables stack env)
     (cond
-      ((and (null? params) (null? formals)) env)
-      ((or  (null? params) (null? formals)) (error "Invalid number of arguments"))
-      ((or (null? (cdr params)) (null? (cdr formals))) (update
-        (car formals)
-        (execute-value-statement (car params) env)
-        (insert (car formals) null funcenv)))
-      (else (update
-        (car formals)
-        (execute-value-statement (car params) env)
-        (insert
-          (car formals)
-          null
-          (set_formal_params
-            (cdr params)
-            (cdr formals)
-            env
-            funcenv))))
-      )))
+      ((and (null? values) (null? variables)) stack)
+      ((not (eq? (length values) (length variables))) (error "invalid arguments"))
+      ((or (null? (rest-of-statements values)) (null? (rest-of-statements variables)))
+       (insertToStack (first-statement variables)
+               (execute-value-statement (first-statement values) env)
+               stack))
+      (else
+       (insertToStack (first-statement variables)
+                      (execute-value-statement (first-statement values) env)
+                      (set-parameters (rest-of-statements values) (rest-of-statements variables) stack env))) )))
+      
