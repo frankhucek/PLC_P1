@@ -61,11 +61,10 @@
       (else                                 (execute-boolean-statement statement stack throw)))))
       ;checks if operator statement is a function
 
-;when calling this in other functions make sure to pass in (pushEmptyStateOnTopStack stack)
 (define execute-begin
   (lambda (statement stack exit break cont throw)
     (cond
-      ((null? statement) stack)
+      ((null? statement) (popState stack))
       (else (execute-begin (rest-of-statements statement) (execute-statement (first-statement statement) stack exit break cont throw) exit break cont throw)) )))
 
 (define execute-try-block
@@ -78,8 +77,8 @@
   (lambda (statement stack exit break cont throw)
     (call/cc
      (lambda (valid-throw)
-               (execute-begin (try-block statement) (pushEmptyStateOnTopStack stack) exit break cont
-                                              (lambda (throw-value passed-stack) (valid-throw (execute-catch-block throw-value (catch-block statement) passed-stack exit break cont throw))))))))
+               (pushEmptyStateOnTopStack (execute-begin (try-block statement) stack exit break cont
+                                              (lambda (throw-value passed-stack) (valid-throw (execute-catch-block throw-value (catch-block statement) (pop passed-stack) exit break cont throw)))))))))
 
 (define execute-try-block-with-finally
   (lambda (statement stack exit break cont throw)
@@ -88,13 +87,13 @@
                (execute-begin (finally-statements statement)
                               (pushEmptyStateOnTopStack (execute-begin (try-block statement) (pushEmptyStateOnTopStack stack) exit break cont
                                                              (lambda (throw-value passed-stack) (valid-throw (execute-begin (finally-statements statement)
-                                                                                                                            (pushEmptyStateOnTopStack (execute-catch-block throw-value (catch-block statement) (pop passed-stack) exit break cont throw))
+                                                                                                                            (execute-catch-block throw-value (catch-block statement) (pop passed-stack) exit break cont throw)
                                                                                                                             exit break cont throw))
                                                              ))) exit break cont throw)))))
 
 (define execute-catch-block
   (lambda (thrown-val statement stack exit break cont throw)
-    (popState (execute-begin (catch-statements statement) (insert (catch-value-caught statement) thrown-val (pushEmptyStateOnTopStack stack)) exit break cont throw)) ))
+    (popState (execute-begin (catch-statements statement) (insert (catch-value-caught statement) thrown-val (pushEmptyStateOnTopStack (pushEmptyStateOnTopStack stack))) exit break cont throw)) ))
 
 (define execute-declaration
   (lambda (statement stack throw)
