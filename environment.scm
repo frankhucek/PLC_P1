@@ -1,7 +1,6 @@
 ; Frank Hucek, Joseph Volpe, Robert Milne
 (load "stack.scm")
 
-(define testenv (box '( (((a b) (1 2))  ((c d) (3 4)))    (((e f) (5 6))  ((g h) (7 8)))    (((j k) (9 10))) )  ))
 (define newenv (lambda () (box '( ((() ())) )  )))
 (define addStackLayer (lambda (layer env) (begin (set-box! env (cons layer (unbox env))) env)))
 (define pushEmptyStack (lambda (env) (addStackLayer (newStack) env)))
@@ -16,6 +15,8 @@
     (cond
       ((null? (cdr env)) (car env))
       (else (globalStackFinder (cdr env))))))
+(define first-value (lambda (l) (car l)))
+(define end-of-list (lambda (l) (cdr l)))
 
 ;update
 (define update
@@ -30,15 +31,15 @@
 (define update-helper
   (lambda (name value unboxed-env)
     (cond
-      ((null? (cdr unboxed-env)) (error "value not in env"))
-      ((containsInStack name (car unboxed-env)) (cons (updateStack name value (car unboxed-env)) (cdr unboxed-env)))
-      (else (cons (car unboxed-env) (update-helper name value (cdr unboxed-env)))) )))
+      ((null? (end-of-list unboxed-env)) (error "value not in env"))
+      ((containsInStack name (first-value unboxed-env)) (cons (updateStack name value (first-value unboxed-env)) (end-of-list unboxed-env)))
+      (else (cons (first-value unboxed-env) (update-helper name value (end-of-list unboxed-env)))) )))
 
 (define update-global-stack
   (lambda (name value env)
     (cond
-      ((null? (cdr env)) (cons (updateStack name value (car env)) '()))
-      (else (cons (car env) (update-global-stack name value (cdr env)))) )))
+      ((null? (end-of-list env)) (cons (updateStack name value (first-value env)) '()))
+      (else (cons (first-value env) (update-global-stack name value (end-of-list env)))) )))
     
 ;insert
 (define insert
@@ -58,14 +59,14 @@
     (cond
       ((containsInStack name (peek env)) (lookupInStack name (peek env)))
       ((containsInGlobal name env) (lookupInStack name (globalStack env)))
-      (else (lookup-helper name (cdr (unbox env)))) )))
+      (else (lookup-helper name (end-of-list (unbox env)))) )))
 
 (define lookup-helper
   (lambda (name unboxed-env)
     (cond
-      ((null? (cdr unboxed-env)) (error "value not in env"))
-      ((containsInStack name (car unboxed-env)) (lookupInStack name (car unboxed-env)))
-      (else (lookup-helper name (cdr unboxed-env))) )))
+      ((null? (end-of-list unboxed-env)) (error "value not in env"))
+      ((containsInStack name (first-value unboxed-env)) (lookupInStack name (first-value unboxed-env)))
+      (else (lookup-helper name (end-of-list unboxed-env))) )))
                 
 ;contains in the top stack/current scope
 (define contains
