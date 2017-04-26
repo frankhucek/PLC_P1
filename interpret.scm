@@ -1,5 +1,5 @@
 ; Frank Hucek, Joseph Volpe, Robert Milne
-(load "functionParser.scm")
+(load "classParser.scm")
 (load "environment.scm")
 
 (define operator (lambda (statement) (if (null? statement) null (car statement))))
