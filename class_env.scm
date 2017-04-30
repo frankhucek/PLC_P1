@@ -1,55 +1,50 @@
 ; class environment
 (load "environment.scm")
 
-#|(define class_environment (lambda () (cons (newenv) '() ))) ; ((list of class_names) (list of environments))
-
 (define testenv1 (box '( (((a b) (1 2))  ((c d) (3 4)))    (((e f) (5 6))  ((g h) (7 8)))    (((j k) (9 10))) )  ))
-(define testenv2 (box '( (((l m) (1 2))  ((n o) (3 4)))    (((p q) (5 6))  ((r s) (7 8)))    (((t u) (9 10))) )  ))
-(define test_class_env (cons testenv1 (cons testenv2 (class_environment) )))
+(define testenv2 (box '((((main y x) ((() ((var a (new A)) (return (+ (dot a x) (dot a y))))) 10 5))))  ))
+(define test-class-env (cons '(class1 class2) (cons (cons testenv1 (cons testenv2 '())) '())) )
 
-(define addEnvLayer
-  (lambda (env class_env)
-    (cons env class_env)))
-
-(define class_peek
-  (lambda (class_env)
-    (car class_env)))
-
-(define class_pop
-  (lambda (class_env)
-    (cdr class_env)))
-
-; insert, update, remove, lookup, contains
-
-; insert
-(define class_insert
-  (lambda (name value class_env)
-    (addEnvLayer (insert name value (class_peek class_env)) (class_pop class_env)) ))
+#|
+Create helper functions to create a new class and instance and to access the portions of a class and instance.
+The class must store the parent class, the list of instance fields, the list of methods/closures,
+and (optionally) a list of class fields/values and a list of constructors.
+Use your state/environment structure for each of these lists.
+The instance must store the instance's class (i.e. the run-time type or the true type) and a list of instance field values.
+      (classname1 (a b c)) where (a b c) is the list of instance field values
 |#
 
-(define testenv1 (box '( (((a b) (1 2))  ((c d) (3 4)))    (((e f) (5 6))  ((g h) (7 8)))    (((j k) (9 10))) )  ))
-(define testenv2 (box '( (((l m) (1 2))  ((n o) (3 4)))    (((p q) (5 6))  ((r s) (7 8)))    (((t u) (9 10))) )  ))
+(define new-class-env (lambda () (cons '() (cons '() '() ))))
+(define class-names (lambda (class_env) (car class_env)))
+(define class-bodies (lambda (class_env) (car (cdr class_env)) ) )
+(define first-class-name (lambda (env) (caar env)))
+(define first-class-info (lambda (env) (car (class-bodies env))))
+(define first-class-body (lambda (env) (cadr (first-class-info env))))
+(define the-working-env (lambda (env) (car env)))
 
-(define new_class_env (lambda () (cons '() (cons (cons (newenv) '() ) '() ))))
-(define test_class_env (cons '(class1 class2) (cons (cons testenv1 (cons testenv2 '())) '())) )
+(define addWorkingEnv
+  (lambda (class_env)
+    (cons (newenv) (cons class_env '()))))
 
-(define class_names (lambda (class_env) (car class_env)))
-(define class_bodies (lambda (class_env) (car (cdr class_env)) ) )
+(define lookup-in-class-with-working-env
+  (lambda (var class-name env)
+    (lookup-in-class var class-name (cadr env))))
+     
+(define lookup-in-class
+  (lambda (var class-name env)
+    (lookup var (class-body-of class-name env))))
 
-(define class_addEnvLayer
-  (lambda (classname env class_env)
-    (cons (cons classname (class_names class_env)) (cons (cons env (class_bodies class_env)) '()) )))
+;this else probs wont work with mutiple classes need fixing
+(define class-body-of
+  (lambda (class-name env)
+    (cond
+      ((eq? class-name (first-class-name env)) (first-class-body env))
+      (else (class-body-of class-name
+                           (cons (cdr (class-names env)) (cdr (class-bodies env))))))))
 
-(define insert_into_class ; ((classnames) (envs)) -> (envs) => (env1 env2 env3) insert variable/value into the correct class's env
-  (lambda (varname value class_env)
-    (cons
-     (class_names class_env); class names
-     (cons (insert varname value (car (class_bodies class_env))) (cdr (class_bodies class_env))) ))) ; class bodies
-
-
-
-
-
-
-
-
+;not working with seversal classes rn
+;(cons (class-bodies (insert-class 'B '(A) testenv2 (new-class-env))) (cons (class-bodies (insert-class 'A '() testenv1 (new-class-env))) '()))
+(define insert-class
+  (lambda (class-name class-parent class-body class-env)
+    (cons (cons class-name (class-names class-env))
+          (cons (cons (cons class-parent (cons class-body '())) (class-bodies class-env)) '())) ))

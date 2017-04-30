@@ -23,17 +23,16 @@
 (define invalid-break (lambda (v) (error "can only break in while")))
 (define invalid-continue (lambda (v) (error "can only continue in a while")))
 (define invalid-throw (lambda (v1 v2) (error "can only throw in a try and function")))
-
-; atom? returns whether or not the given param is an atom
-(define atom?
-  (lambda (x)
-    (and (not (pair? x)) (not (null? x)))))
+(define class-name (lambda (statement) (car statement)))
+(define class-parent (lambda (statement) (cadr statement)))
+(define class-body (lambda (statement) (caddr statement)))
+(define atom? (lambda (x) (and (not (pair? x)) (not (null? x)))))
 
 (define interpret
-  (lambda (filename)
-    (execute-function-call '(funcall main) (interpret-global-statements filename (newenv)) invalid-throw)))
-       
-(define interpret-global-statements
+  (lambda (filename classname)
+    (execute-function-call '(funcall main) classname (addWorkingEnv (interpret-classes filename (new-class-env))) invalid-throw)))
+
+(define interpret-classes
   (lambda (filename env)
     (interpret-parse-tree (parser filename) env exit invalid-break invalid-continue invalid-throw)))
       
@@ -42,12 +41,14 @@
     (cond
       ((null? parsetree) stack)
       (else (interpret-parse-tree (rest-of-statements parsetree)
-                                  (begin (execute-statement (first-statement parsetree) stack exit break cont throw) stack)
+                                  (execute-statement (first-statement parsetree) stack exit break cont throw)
+                                  ;(begin (execute-statement (first-statement parsetree) stack exit break cont throw) stack)
                                   exit break cont throw)) )))
 
 (define execute-statement ; M_statement
   (lambda (statement stack exit break cont throw)
     (cond
+      ((eq? 'class (operator statement))    (interpret-class (rest-of-statements statement) stack))
       ((eq? 'begin (operator statement))    (execute-begin (rest-of-statements statement) (pushEmptyStateOnTopStack stack) exit break cont throw))
       ((eq? 'break (operator statement))    (break (popState stack)))
       ((eq? 'continue (operator statement)) (cont (popState stack)))
@@ -165,7 +166,8 @@
       ((number? statement) statement)  
       ((atom? statement) (lookup statement env))
       ((eq? 'function (operator statement)) (save-function-definition  statement env))
-      ((eq? 'funcall  (operator statement)) (execute-function-call statement env throw))
+      ((eq? 'static-function (operator statement)) (save-function-definition  statement env))
+      ((eq? 'funcall  (operator statement)) (execute-function-call statement class-name env throw))
       ;should be a list, therefore a value statement with an operator and operands
       ((null? (execute-value-statement (operand1 statement) env throw)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
       ((eq? '- (operator statement)) (handle-unary-sign statement env)) ;handles the case where there might be negative sign
@@ -214,18 +216,18 @@
                (interpret-parse-tree statement env exit invalid-break invalid-continue throw) ))))
 
 (define execute-function-call
-  (lambda (statement env throw)
-    (let ([return-value (interpret-function (functionDefinition (lookup (functionName statement) env))
+  (lambda (statement class-name env throw)
+    (let ([return-value (interpret-function (functionDefinition (lookup-in-class-with-working-env (functionName statement) class-name env))
                                    (addStackLayer
                                     (set-parameters
                                      (paramsPassingIn statement) ;parameters your passing in e.g. 1, 2, 3 in foo(1, 2, 3)
-                                     (first-statement (lookup (operand1 statement) env)) ;variables the values will be assigned to
+                                     (first-statement (lookup-in-class-with-working-env (operand1 statement) class-name env)) ;variables the values will be assigned to
                                      (newStack)
-                                     env
+                                     (the-working-env env)
                                      )
-                                    env)
+                                    (the-working-env env))
                                    throw)])
-        (pop env)
+        (pop (the-working-env env))
         return-value) ))
 
 (define set-parameters
@@ -241,4 +243,53 @@
        (insertToStack (first-statement variables)
                       (execute-value-statement (first-statement values) env invalid-throw)
                       (set-parameters (rest-of-statements values) (rest-of-statements variables) stack env))) )))
-      
+
+;will be passed in
+;(A () ((var x 5) (var y 10) (static-function main () ((var a (new A)) (return (+ (dot a x) (dot a y)))))))
+(define interpret-class
+  (lambda (statement env)
+    (insert-class (class-name statement)
+                  (class-parent statement)
+                  (interpret-parse-tree (class-body statement) (newenv) exit invalid-break invalid-continue invalid-throw)
+                  env) ))
+
+
+
+
+
+;put into class_env
+(define new-class-env (lambda () (cons '() (cons '() '() ))))
+(define class-names (lambda (class_env) (car class_env)))
+(define class-bodies (lambda (class_env) (car (cdr class_env)) ) )
+(define first-class-name (lambda (env) (caar env)))
+(define first-class-info (lambda (env) (car (class-bodies env))))
+(define first-class-body (lambda (env) (cadr (first-class-info env))))
+(define the-working-env (lambda (env) (car env)))
+
+(define addWorkingEnv
+  (lambda (class_env)
+    (cons (newenv) (cons class_env '()))))
+
+(define lookup-in-class-with-working-env
+  (lambda (var class-name env)
+    (lookup-in-class var class-name (cadr env))))
+     
+(define lookup-in-class
+  (lambda (var class-name env)
+    (lookup var (class-body-of class-name env))))
+
+;this else probs wont work with mutiple classes need fixing
+(define class-body-of
+  (lambda (class-name env)
+    (cond
+      ((eq? class-name (first-class-name env)) (first-class-body env))
+      (else (class-body-of class-name
+                           (cons (cdr (class-names env)) (cdr (class-bodies env))))))))
+
+;not working with seversal classes rn
+;(cons (class-bodies (insert-class 'B '(A) testenv2 (new-class-env))) (cons (class-bodies (insert-class 'A '() testenv1 (new-class-env))) '()))
+(define insert-class
+  (lambda (class-name class-parent class-body class-env)
+    (cons (cons class-name (class-names class-env))
+          (cons (cons (cons class-parent (cons class-body '())) (class-bodies class-env)) '())) ))
+
