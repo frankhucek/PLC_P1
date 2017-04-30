@@ -1,9 +1,12 @@
 ; class environment
 (load "environment.scm")
 
-(define testenv1 (box '( (((a b) (1 2))  ((c d) (3 4)))    (((e f) (5 6))  ((g h) (7 8)))    (((j k) (9 10))) )  ))
+(define testenv1 (box '((((main a b) ((() ((var a (new A)) (return (+ (dot a x) (dot a y))))) 15 9))))  ))
 (define testenv2 (box '((((main y x) ((() ((var a (new A)) (return (+ (dot a x) (dot a y))))) 10 5))))  ))
-(define test-class-env (cons '(class1 class2) (cons (cons testenv1 (cons testenv2 '())) '())) )
+(define test-class-env (cons '(class1 class2)
+                             (cons (cons (cons '() (cons testenv2 '()))
+                                         (cons (cons '() (cons testenv1 '())) '())
+                                         ) '())) )
 
 #|
 Create helper functions to create a new class and instance and to access the portions of a class and instance.
@@ -46,3 +49,7 @@ The instance must store the instance's class (i.e. the run-time type or the true
   (lambda (class-name class-parent class-body class-env)
     (cons (cons class-name (class-names class-env))
           (cons (cons (cons class-parent (cons class-body '())) (class-bodies class-env)) '())) ))
+
+(define class-instance-fields
+  (lambda (class-name class-env)
+    (instance-fields (class-body-of class-name class-env))))

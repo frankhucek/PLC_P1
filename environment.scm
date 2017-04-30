@@ -17,6 +17,7 @@
       (else (globalStackFinder (cdr env))))))
 (define first-value (lambda (l) (car l)))
 (define end-of-list (lambda (l) (cdr l)))
+(define atom? (lambda (x) (and (not (pair? x)) (not (null? x)))))
 
 ;update
 (define update
@@ -76,3 +77,21 @@
 (define containsInGlobal
   (lambda (name env)
     (containsInStack name (globalStack env)) ))
+
+(define instance-fields
+  (lambda (env)
+    (instance-fields-helper (car (car (unbox env))))))
+
+;'((main y x) ((() ((var a (new A)) (return (+ (dot a x) (dot a y))))) 10 5)))
+
+(define instance-fields-helper
+  (lambda (unboxed-env)
+    (cond
+      ((null? (firstValue unboxed-env)) unboxed-env)
+      ((atom? (firstValue unboxed-env))
+       (cons (cons (firstVariable unboxed-env)
+                   (car (instance-fields-helper (combineVariablesAndValues (variablesAfterTheFirst unboxed-env) (valuesAfterTheFirst unboxed-env)))))
+             (cons (cons (firstValue unboxed-env)
+                         (cadr (instance-fields-helper (combineVariablesAndValues (variablesAfterTheFirst unboxed-env) (valuesAfterTheFirst unboxed-env)))))
+                   '())))  
+      (else (instance-fields-helper (combineVariablesAndValues (variablesAfterTheFirst unboxed-env) (valuesAfterTheFirst unboxed-env)))) )))
