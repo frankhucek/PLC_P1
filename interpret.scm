@@ -1,6 +1,6 @@
 ; Frank Hucek, Joseph Volpe, Robert Milne
 (load "classParser.scm")
-(load "environment.scm")
+(load "class_env.scm")
 
 (define operator (lambda (statement) (if (null? statement) null (car statement))))
 (define operand1 (lambda (statement) (if (null? (cdr statement)) null (car (cdr statement))) ))
@@ -252,44 +252,3 @@
                   (class-parent statement)
                   (interpret-parse-tree (class-body statement) (newenv) exit invalid-break invalid-continue invalid-throw)
                   env) ))
-
-
-
-
-
-;put into class_env
-(define new-class-env (lambda () (cons '() (cons '() '() ))))
-(define class-names (lambda (class_env) (car class_env)))
-(define class-bodies (lambda (class_env) (car (cdr class_env)) ) )
-(define first-class-name (lambda (env) (caar env)))
-(define first-class-info (lambda (env) (car (class-bodies env))))
-(define first-class-body (lambda (env) (cadr (first-class-info env))))
-(define the-working-env (lambda (env) (car env)))
-
-(define addWorkingEnv
-  (lambda (class_env)
-    (cons (newenv) (cons class_env '()))))
-
-(define lookup-in-class-with-working-env
-  (lambda (var class-name env)
-    (lookup-in-class var class-name (cadr env))))
-     
-(define lookup-in-class
-  (lambda (var class-name env)
-    (lookup var (class-body-of class-name env))))
-
-;this else probs wont work with mutiple classes need fixing
-(define class-body-of
-  (lambda (class-name env)
-    (cond
-      ((eq? class-name (first-class-name env)) (first-class-body env))
-      (else (class-body-of class-name
-                           (cons (cdr (class-names env)) (cdr (class-bodies env))))))))
-
-;not working with seversal classes rn
-;(cons (class-bodies (insert-class 'B '(A) testenv2 (new-class-env))) (cons (class-bodies (insert-class 'A '() testenv1 (new-class-env))) '()))
-(define insert-class
-  (lambda (class-name class-parent class-body class-env)
-    (cons (cons class-name (class-names class-env))
-          (cons (cons (cons class-parent (cons class-body '())) (class-bodies class-env)) '())) ))
-

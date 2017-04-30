@@ -42,8 +42,6 @@ The instance must store the instance's class (i.e. the run-time type or the true
       (else (class-body-of class-name
                            (cons (cdr (class-names env)) (cdr (class-bodies env))))))))
 
-;not working with seversal classes rn
-;(cons (class-bodies (insert-class 'B '(A) testenv2 (new-class-env))) (cons (class-bodies (insert-class 'A '() testenv1 (new-class-env))) '()))
 (define insert-class
   (lambda (class-name class-parent class-body class-env)
     (cons (cons class-name (class-names class-env))
