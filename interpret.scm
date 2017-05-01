@@ -27,6 +27,7 @@
 (define class-parent (lambda (statement) (cadr statement)))
 (define class-body (lambda (statement) (caddr statement)))
 (define instance-variables-from-left-side (lambda (statement) (cadr statement)))
+(define class-type-from-left-side (lambda (statement) (car statement)))
 (define atom? (lambda (x) (and (not (pair? x)) (not (null? x)))))
 
 (define interpret
@@ -171,7 +172,7 @@
       ((eq? 'static-function (operator statement)) (save-function-definition  statement env))
       ((eq? 'funcall  (operator statement)) (execute-function-call statement class-name env throw))
       ;should be a list, therefore either a dot operator, or value statement with an operator and operands
-      ((eq? 'dot (operator statement)) (lookupInState (operand2 statement) (instance-variables-from-left-side (left-side-dot-expr statement env))))
+      ((eq? 'dot (operator statement)) (handle-dot-operator statement env throw))
       ((null? (execute-value-statement (operand1 statement) env throw)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
       ((eq? '- (operator statement)) (handle-unary-sign statement env)) ;handles the case where there might be negative sign
       ((null? (execute-value-statement (operand2 statement) env throw)) (error "Variable two is not assigned")) ;checks operand two for below operations
@@ -220,11 +221,11 @@
 
 (define execute-function-call
   (lambda (statement class-name env throw)
-    (let ([return-value (interpret-function (functionDefinition (lookup-in-class-with-working-env (functionName statement) class-name env))
+    (let ([return-value (interpret-function (functionDefinition (lookup-in-class (functionName statement) class-name env))
                                    (cons (addStackLayer
                                     (set-parameters
                                      (paramsPassingIn statement) ;parameters your passing in e.g. 1, 2, 3 in foo(1, 2, 3)
-                                     (first-statement (lookup-in-class-with-working-env (operand1 statement) class-name env)) ;variables the values will be assigned to
+                                     (first-statement (lookup-in-class (operand1 statement) class-name env)) ;variables the values will be assigned to
                                      (newStack)
                                      (the-working-env env)
                                      )
@@ -273,30 +274,30 @@
   (lambda (statement env)
     (lookup-in-working-env (operand1 statement) env)))
 
+;statement passed in will be (dot x y) -> x.y
+(define handle-dot-operator
+  (lambda (statement env throw)
+    (cond
+      ((containsInState (operand2 statement) (instance-variables-from-left-side (left-side-dot-expr statement env)))
+       (lookupInState (operand2 statement) (instance-variables-from-left-side (left-side-dot-expr statement env))))
+      ((is-function-in-class (operand2 statement) env) (execute-function-call (cons 'funcall (cons (operand2 statement) '()))
+                                                                              (class-type-from-left-side (left-side-dot-expr statement env))
+                                                                              env
+                                                                              throw))
+      (else (error "left side object does not contain the variable or function on the right side")) )))
+      
+    
 #|
 All M_state and M_value functions will need to pass a parameter for the class-type (i.e. the compile-time type or current type)
 
 Add a fourth value to the function closure: a function that looks up the function's class in the environment/state.
 
-Update the code that evaluates a function call to deal with objects and classes. (Follow the denotational semantics sketched in lecture.)
 
-Add code to the function lookup to handle the dot operator. See if you can interpret an example like:
-class A {
-  function f() {
-    return 5;
-  }
 
-  static function main() {
-    var a = new A();
-    return a.f();
-  }
-}
 
 Create helper functions that successfully declare, lookup, and update non-static fields.
 The functions will need to deal with the fact the the field names part of the state structure is in the class
 and the field values part of the state structure is in the instance.
-
-Add code to the places where you do variable lookups so that it can handle the dot operator.
 
 Change your code for a variable to first lookup the variable in the local environment and if that fails to look in the non-static fields.
 
