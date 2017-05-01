@@ -26,6 +26,7 @@
 (define class-name (lambda (statement) (car statement)))
 (define class-parent (lambda (statement) (cadr statement)))
 (define class-body (lambda (statement) (caddr statement)))
+(define instance-variables-from-left-side (lambda (statement) (cadr statement)))
 (define atom? (lambda (x) (and (not (pair? x)) (not (null? x)))))
 
 (define interpret
@@ -99,9 +100,9 @@
 (define execute-declaration
   (lambda (statement stack throw)
     (cond
-      ((contains (operand1 statement) stack) (error "No redefining variables"))
-      ((null? (operand2 statement)) (insert (operand1 statement) null stack))
-      (else (insert (operand1 statement) (execute-boolean-statement (operand2 statement) stack throw) stack)))))
+      ((contains-in-working-env (operand1 statement) stack) (error "No redefining variables"))
+      ((null? (operand2 statement)) (insert-in-working-env (operand1 statement) null stack))
+      (else (insert-in-working-env (operand1 statement) (execute-boolean-statement (operand2 statement) stack throw) stack)))))
                                           ; changed exec-bool from exec-val
 
 (define execute-assignment
@@ -139,6 +140,7 @@
   (lambda (statement stack throw)
     (cond
       ((atom? statement) (execute-value-statement statement stack throw))
+      ((eq? 'new (operator statement)) (create-new-instance (operand1 statement) stack))
       ((eq? '== (operator statement)) (= (execute-value-statement (operand1 statement) stack throw)
                                          (execute-value-statement (operand2 statement) stack throw)))
       ((eq? '!= (operator statement)) (not (= (execute-value-statement (operand1 statement) stack throw)
@@ -168,7 +170,8 @@
       ((eq? 'function (operator statement)) (save-function-definition  statement env))
       ((eq? 'static-function (operator statement)) (save-function-definition  statement env))
       ((eq? 'funcall  (operator statement)) (execute-function-call statement class-name env throw))
-      ;should be a list, therefore a value statement with an operator and operands
+      ;should be a list, therefore either a dot operator, or value statement with an operator and operands
+      ((eq? 'dot (operator statement)) (lookupInState (operand2 statement) (instance-variables-from-left-side (left-side-dot-expr statement env))))
       ((null? (execute-value-statement (operand1 statement) env throw)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
       ((eq? '- (operator statement)) (handle-unary-sign statement env)) ;handles the case where there might be negative sign
       ((null? (execute-value-statement (operand2 statement) env throw)) (error "Variable two is not assigned")) ;checks operand two for below operations
@@ -218,7 +221,7 @@
 (define execute-function-call
   (lambda (statement class-name env throw)
     (let ([return-value (interpret-function (functionDefinition (lookup-in-class-with-working-env (functionName statement) class-name env))
-                                   (addStackLayer
+                                   (cons (addStackLayer
                                     (set-parameters
                                      (paramsPassingIn statement) ;parameters your passing in e.g. 1, 2, 3 in foo(1, 2, 3)
                                      (first-statement (lookup-in-class-with-working-env (operand1 statement) class-name env)) ;variables the values will be assigned to
@@ -226,6 +229,7 @@
                                      (the-working-env env)
                                      )
                                     (the-working-env env))
+                                         (cons (class-definitions env) '()))
                                    throw)])
         (pop (the-working-env env))
         return-value) ))
@@ -244,11 +248,60 @@
                       (execute-value-statement (first-statement values) env invalid-throw)
                       (set-parameters (rest-of-statements values) (rest-of-statements variables) stack env))) )))
 
-;will be passed in
-;(A () ((var x 5) (var y 10) (static-function main () ((var a (new A)) (return (+ (dot a x) (dot a y)))))))
+;will be passed in something like '(A () ((var x 5) (var y 10) (static-function main () ((var a (new A)) (return (+ (dot a x) (dot a y)))))))
+;reads the class and inserts it into the class definitions in the env
 (define interpret-class
   (lambda (statement env)
     (insert-class (class-name statement)
                   (class-parent statement)
                   (interpret-parse-tree (class-body statement) (newenv) exit invalid-break invalid-continue invalid-throw)
                   env) ))
+
+;The instance must store the instance's class (i.e. the run-time type or the true type) and a list of instance field values.
+;returns an instance with the structure (classname ((a b) (1 2))) where classname == class-name, a&b are instance fields, 1&2 respective values
+(define create-new-instance
+  (lambda (class-name env)
+    (cons class-name
+          (cons (class-instance-fields class-name env)
+                '()))))
+
+;statement -> (dot a y)
+;env -> (working-env/box class-definitions)
+;if in working-env there exists an instance of 'X of class X where there are no instance variables, then there is kept '(X (() ()))
+;   therefore this returns '(X (() ()))
+(define left-side-dot-expr
+  (lambda (statement env)
+    (lookup-in-working-env (operand1 statement) env)))
+
+#|
+All M_state and M_value functions will need to pass a parameter for the class-type (i.e. the compile-time type or current type)
+
+Add a fourth value to the function closure: a function that looks up the function's class in the environment/state.
+
+Update the code that evaluates a function call to deal with objects and classes. (Follow the denotational semantics sketched in lecture.)
+
+Add code to the function lookup to handle the dot operator. See if you can interpret an example like:
+class A {
+  function f() {
+    return 5;
+  }
+
+  static function main() {
+    var a = new A();
+    return a.f();
+  }
+}
+
+Create helper functions that successfully declare, lookup, and update non-static fields.
+The functions will need to deal with the fact the the field names part of the state structure is in the class
+and the field values part of the state structure is in the instance.
+
+Add code to the places where you do variable lookups so that it can handle the dot operator.
+
+Change your code for a variable to first lookup the variable in the local environment and if that fails to look in the non-static fields.
+
+Update the code that interprets an assignment statement so that it looks for the variables with dots in the instance fields and for variables without dots it first looks in the local environment and then in the instance fields.
+
+Now test on the first 6 sample programs.
+|#
+

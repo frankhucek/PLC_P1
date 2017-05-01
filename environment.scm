@@ -26,7 +26,6 @@
       ((containsInStack name (peek env)) (addStackLayer (updateStack name value (peek env)) (pop env)))
       ((containsInStack name (globalStack env)) (begin (set-box! env (update-global-stack name value (unbox env))) env))
       ;(else (error "variable not in the current scope")))))
-
       (else (begin (set-box! env (update-helper name value (unbox env))) env)) )))
 
 (define update-helper
@@ -83,7 +82,6 @@
     (instance-fields-helper (car (car (unbox env))))))
 
 ;'((main y x) ((() ((var a (new A)) (return (+ (dot a x) (dot a y))))) 10 5)))
-
 (define instance-fields-helper
   (lambda (unboxed-env)
     (cond

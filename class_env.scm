@@ -8,27 +8,34 @@
                                          (cons (cons '() (cons testenv1 '())) '())
                                          ) '())) )
 
-#|
-Create helper functions to create a new class and instance and to access the portions of a class and instance.
-The class must store the parent class, the list of instance fields, the list of methods/closures,
-and (optionally) a list of class fields/values and a list of constructors.
-Use your state/environment structure for each of these lists.
-The instance must store the instance's class (i.e. the run-time type or the true type) and a list of instance field values.
-      (classname1 (a b c)) where (a b c) is the list of instance field values
-|#
-
 (define new-class-env (lambda () (cons '() (cons '() '() ))))
 (define class-names (lambda (class_env) (car class_env)))
 (define class-bodies (lambda (class_env) (car (cdr class_env)) ) )
 (define first-class-name (lambda (env) (caar env)))
 (define first-class-info (lambda (env) (car (class-bodies env))))
 (define first-class-body (lambda (env) (cadr (first-class-info env))))
+(define addWorkingEnv (lambda (class_env) (cons (newenv) (cons class_env '()))))
 (define the-working-env (lambda (env) (car env)))
+(define class-definitions (lambda (env) (cadr env))) ;use when working with a class_env with a working env on
 
-(define addWorkingEnv
-  (lambda (class_env)
-    (cons (newenv) (cons class_env '()))))
+(define insert-in-working-env
+  (lambda (var val env)
+    (cond
+      ((box? env) (insert var val env))
+      (else (insert var val (the-working-env env))))))
 
+(define contains-in-working-env
+  (lambda (var env)
+    (cond
+      ((box? env) (contains var env))
+      (else (contains var (the-working-env env))))))
+
+(define lookup-in-working-env
+  (lambda (var env)
+    (cond
+      ((box? env) (lookup var env))
+      (else (lookup var (the-working-env env))))))
+     
 (define lookup-in-class-with-working-env
   (lambda (var class-name env)
     (lookup-in-class var class-name (cadr env))))
@@ -37,13 +44,14 @@ The instance must store the instance's class (i.e. the run-time type or the true
   (lambda (var class-name env)
     (lookup var (class-body-of class-name env))))
 
-;this else probs wont work with mutiple classes need fixing
 (define class-body-of
   (lambda (class-name env)
     (cond
       ((eq? class-name (first-class-name env)) (first-class-body env))
       (else (class-body-of class-name
-                           (cons (cdr (class-names env)) (cdr (class-bodies env))))))))
+                           (cons (cdr (class-names env))
+                                 (cons (cdr (class-bodies env))
+                                       '())))))))
 
 (define insert-class
   (lambda (class-name class-parent class-body class-env)
@@ -52,4 +60,4 @@ The instance must store the instance's class (i.e. the run-time type or the true
 
 (define class-instance-fields
   (lambda (class-name class-env)
-    (instance-fields (class-body-of class-name class-env))))
+    (instance-fields (class-body-of class-name (class-definitions class-env)))))
