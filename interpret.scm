@@ -260,7 +260,7 @@
                                                     class-name
                                                     object-calling
                                                     (newStack)
-                                                    (the-working-env env)
+                                                    env
                                                     )
                                                    (the-working-env env))
                                                   (cons (class-definitions env) '()))
@@ -323,6 +323,6 @@
   (lambda (statement-ob passed-ob)
     (cond
       ((eq? statement-ob passed-ob) statement-ob)
-      ((and (eq? 'this statement-ob) (not (eq? 'this passed-ob))) passed-ob)
+      ((and (eq? 'this statement-ob) (and (not (eq? 'this passed-ob)) (not (eq? 'classname passed-ob)))) passed-ob)
       (else statement-ob) )))
 
