@@ -29,7 +29,6 @@
 (define class-body (lambda (statement) (caddr statement)))
 (define instance-variables-from-left-side (lambda (statement) (cadr statement)))
 (define class-type-from-left-side (lambda (statement) (car statement)))
-(define classNameFromDotOperator (lambda (statement) (operand1 (functionName statement))))
 (define atom? (lambda (x) (and (not (pair? x)) (not (null? x)))))
 
 (define interpret
@@ -169,7 +168,7 @@
       ((null? statement) statement)
       ((isABooleanWord? statement) (convertBooleanWord statement))
       ((number? statement) statement)  
-      ((atom? statement) (lookup statement env))
+      ((atom? statement) (lookup-in-working-env statement env))
       ((eq? 'function (operator statement)) (save-function-definition  statement env))
       ((eq? 'static-function (operator statement)) (save-function-definition  statement env))
       ((eq? 'funcall  (operator statement)) (handle-function-call statement env throw)) 
@@ -225,7 +224,7 @@
 (define handle-function-call
   (lambda (statement env throw)
     (execute-function-call statement
-                           (classNameFromDotOperator statement)
+                           (class-type-from-left-side (left-side-dot-expr (functionName statement) env))
                            env
                            throw) ))
   
@@ -295,5 +294,8 @@ and for variables without dots it first looks in the local environment
 and then in the instance fields.
 
 Now test on the first 6 sample programs.
+
+
+HANDLE THIS.x
 |#
 
