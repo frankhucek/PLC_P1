@@ -19,6 +19,10 @@
 (define class-definitions (lambda (env) (cadr env))) ;use when working with a class_env with a working env on (remember this for testing too so add worklayer)
 (define pop-working-env-from-class-definitions (lambda (env) (cdr env)))
 (define update-by-popping-off-working-env (lambda (working-env env) (cons working-env (pop-working-env-from-class-definitions env))))
+(define object-calling-in-pair (lambda (object-calling-and-var) (car object-calling-and-var)))
+(define var-in-pair (lambda (object-calling-and-var) (cadr object-calling-and-var)))
+(define instance-fields-for-instance-in-working-env (lambda (instance) (cadr instance)))
+(define class-type-for-instance-in-working-env (lambda (instance) (car instance)))
 
 (define insert-in-working-env
   (lambda (var val env)
@@ -38,12 +42,33 @@
       ((box? env) (update var val env))
       (else (update var val (the-working-env env))))))
 
+(define update-instance-values
+  (lambda (object-calling-and-var val env)
+    (cons (update (object-calling-in-pair object-calling-and-var)
+                  (cons (class-type-for-instance-in-working-env (lookup-in-working-env (object-calling-in-pair object-calling-and-var) env))
+                        (cons (updateState (var-in-pair object-calling-and-var)
+                                           val
+                                           (instance-fields-for-instance-in-working-env (lookup-in-working-env (object-calling-in-pair object-calling-and-var) env)))
+                              '()))
+                  (the-working-env env))
+          (cons (class-definitions env) '()))))
+
 (define lookup-in-working-env
   (lambda (var env)
     (cond
       ((box? env) (lookup var env))
       (else (lookup var (the-working-env env))))))
-      
+
+;inserts a class into the list of class defs when first interpreting the file
+(define insert-class
+  (lambda (class-name class-parent class-body class-env)
+    (cons (cons class-name (class-names class-env))
+          (cons (cons (cons class-parent (cons class-body '())) (class-bodies class-env)) '())) ))
+
+(define contains-in-class
+  (lambda (statement classname class-env-with-working-layer)
+    (contains statement (class-body-of classname (class-definitions class-env-with-working-layer)))))
+     
 (define lookup-in-class
   (lambda (var class-name class-env-with-working-layer)
     (lookup-in-class-helper var class-name (class-definitions class-env-with-working-layer))))
@@ -64,15 +89,13 @@
                                  (cons (cdr (class-bodies env))
                                        '())))))))
 
-(define insert-class
-  (lambda (class-name class-parent class-body class-env)
-    (cons (cons class-name (class-names class-env))
-          (cons (cons (cons class-parent (cons class-body '())) (class-bodies class-env)) '())) ))
-
+;gets instance fields for a specified class
+;returns in state form ((a b) (1 2))
 (define class-instance-fields
   (lambda (class-name class-env-with-working-layer)
     (instance-fields (class-body-of class-name (class-definitions class-env-with-working-layer)))))
 
+;checks if the given function-name is a function within the class and checks to make sure not an instance field
 (define is-function-in-class
   (lambda (class-name function-name class-env-with-working-layer)
     (and (contains function-name (class-body-of class-name (class-definitions class-env-with-working-layer)))
