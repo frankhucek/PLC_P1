@@ -15,6 +15,7 @@
 (define finally-block (lambda (statement) (if (null? (cdr (cdr statement))) null (car (cdr (cdr statement)))) ))
 (define finally-statements (lambda (statement) (if (null? (cdr (cdr statement))) null (cadr (car (cdr (cdr statement))))) ))
 (define functionName (lambda (statement) (operand1 statement)))
+(define functionNameFromDotOperator (lambda (statement) (operand2 (functionName statement))))
 (define functionParameters (lambda (statement) (operand2 statement)))
 (define functionBody (lambda (statement) (operand3 statement)))
 (define functionDefinition (lambda (statement) (cadr statement)))
@@ -28,11 +29,12 @@
 (define class-body (lambda (statement) (caddr statement)))
 (define instance-variables-from-left-side (lambda (statement) (cadr statement)))
 (define class-type-from-left-side (lambda (statement) (car statement)))
+(define classNameFromDotOperator (lambda (statement) (operand1 (functionName statement))))
 (define atom? (lambda (x) (and (not (pair? x)) (not (null? x)))))
 
 (define interpret
   (lambda (filename classname)
-    (execute-function-call '(funcall main) classname (addWorkingEnv (interpret-classes filename (new-class-env))) invalid-throw)))
+    (execute-function-call '(funcall (dot classname main)) classname (addWorkingEnv (interpret-classes filename (new-class-env))) invalid-throw)))
 
 (define interpret-classes
   (lambda (filename env)
@@ -170,9 +172,9 @@
       ((atom? statement) (lookup statement env))
       ((eq? 'function (operator statement)) (save-function-definition  statement env))
       ((eq? 'static-function (operator statement)) (save-function-definition  statement env))
-      ((eq? 'funcall  (operator statement)) (execute-function-call statement class-name env throw))
+      ((eq? 'funcall  (operator statement)) (handle-function-call statement env throw)) 
       ;should be a list, therefore either a dot operator, or value statement with an operator and operands
-      ((eq? 'dot (operator statement)) (handle-dot-operator statement env throw))
+      ((eq? 'dot (operator statement)) (lookupInState (operand2 statement) (instance-variables-from-left-side (left-side-dot-expr statement env))))
       ((null? (execute-value-statement (operand1 statement) env throw)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
       ((eq? '- (operator statement)) (handle-unary-sign statement env)) ;handles the case where there might be negative sign
       ((null? (execute-value-statement (operand2 statement) env throw)) (error "Variable two is not assigned")) ;checks operand two for below operations
@@ -219,13 +221,21 @@
     (call/cc (lambda (exit)
                (interpret-parse-tree statement env exit invalid-break invalid-continue throw) ))))
 
+;passed in (funcall (dot x foobar) 10 12) where 10 and 12 are parameters passed into function foobar called from class x
+(define handle-function-call
+  (lambda (statement env throw)
+    (execute-function-call statement
+                           (classNameFromDotOperator statement)
+                           env
+                           throw) ))
+  
 (define execute-function-call
   (lambda (statement class-name env throw)
-    (let ([return-value (interpret-function (functionDefinition (lookup-in-class (functionName statement) class-name env))
+    (let ([return-value (interpret-function (functionDefinition (lookup-in-class (functionNameFromDotOperator statement) class-name env))
                                    (cons (addStackLayer
                                     (set-parameters
                                      (paramsPassingIn statement) ;parameters your passing in e.g. 1, 2, 3 in foo(1, 2, 3)
-                                     (first-statement (lookup-in-class (operand1 statement) class-name env)) ;variables the values will be assigned to
+                                     (first-statement (lookup-in-class (functionNameFromDotOperator statement) class-name env)) ;variables the values will be assigned to
                                      (newStack)
                                      (the-working-env env)
                                      )
@@ -273,35 +283,16 @@
 (define left-side-dot-expr
   (lambda (statement env)
     (lookup-in-working-env (operand1 statement) env)))
-
-;statement passed in will be (dot x y) -> x.y
-(define handle-dot-operator
-  (lambda (statement env throw)
-    (cond
-      ((containsInState (operand2 statement) (instance-variables-from-left-side (left-side-dot-expr statement env)))
-       (lookupInState (operand2 statement) (instance-variables-from-left-side (left-side-dot-expr statement env))))
-      ((is-function-in-class (operand2 statement) env) (execute-function-call (cons 'funcall (cons (operand2 statement) '()))
-                                                                              (class-type-from-left-side (left-side-dot-expr statement env))
-                                                                              env
-                                                                              throw))
-      (else (error "left side object does not contain the variable or function on the right side")) )))
-      
     
 #|
 All M_state and M_value functions will need to pass a parameter for the class-type (i.e. the compile-time type or current type)
 
-Add a fourth value to the function closure: a function that looks up the function's class in the environment/state.
-
-
-
-
-Create helper functions that successfully declare, lookup, and update non-static fields.
-The functions will need to deal with the fact the the field names part of the state structure is in the class
-and the field values part of the state structure is in the instance.
-
 Change your code for a variable to first lookup the variable in the local environment and if that fails to look in the non-static fields.
 
-Update the code that interprets an assignment statement so that it looks for the variables with dots in the instance fields and for variables without dots it first looks in the local environment and then in the instance fields.
+Update the code that interprets an assignment statement so that it
+looks for the variables with dots in the instance fields
+and for variables without dots it first looks in the local environment
+and then in the instance fields.
 
 Now test on the first 6 sample programs.
 |#

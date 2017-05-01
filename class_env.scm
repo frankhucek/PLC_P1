@@ -30,6 +30,12 @@
       ((box? env) (contains var env))
       (else (contains var (the-working-env env))))))
 
+(define update-in-working-env
+  (lambda (var val env)
+    (cond
+      ((box? env) (update var val env))
+      (else (update var val (the-working-env env))))))
+
 (define lookup-in-working-env
   (lambda (var env)
     (cond
