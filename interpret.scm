@@ -190,7 +190,7 @@
       ((atom? statement) (variable-lookup statement classname env))
       ((eq? 'function (operator statement)) (save-function-definition  statement env))
       ((eq? 'static-function (operator statement)) (save-function-definition  statement env))
-      ((eq? 'funcall  (operator statement)) (handle-function-call statement classname env throw)) 
+      ((eq? 'funcall  (operator statement)) (handle-function-call statement classname object-calling env throw)) 
       ;should be a list, therefore either a dot operator, or value statement with an operator and operands
       ((eq? 'dot (operator statement)) (lookupInState (operand2 statement) (instance-variables-from-left-side (left-side-dot-expr statement classname object-calling env))))
       ((null? (execute-value-statement (operand1 statement) classname object-calling env throw)) (error "Variable one is not assigned")) ;checks to see if operand one has a value
@@ -241,10 +241,10 @@
 
 ;passed in (funcall (dot x foobar) 10 12) where 10 and 12 are parameters passed into function foobar called from class x
 (define handle-function-call
-  (lambda (statement classname env throw)
+  (lambda (statement classname object-calling env throw)
     (execute-function-call statement
-                           (class-type-from-left-side (left-side-dot-expr (functionName statement) classname (left-side-of-dot (functionName statement)) env))
-                           (left-side-of-dot (functionName statement))
+                           (class-type-from-left-side (left-side-dot-expr (functionName statement) classname object-calling env))
+                           object-calling
                            env
                            throw) ))
   
@@ -252,7 +252,7 @@
   (lambda (statement class-name object-calling env throw)
     (let ([return-value (interpret-function (functionDefinition (lookup-in-class (functionNameFromDotOperator statement) class-name env))
                                             class-name
-                                            object-calling
+                                            (correct-object-calling (left-side-of-dot (functionName statement)) object-calling)
                                             (cons (addStackLayer
                                                    (set-parameters
                                                     (paramsPassingIn statement) ;parameters your passing in e.g. 1, 2, 3 in foo(1, 2, 3)
@@ -267,7 +267,7 @@
                                             throw)])
         (pop (the-working-env env))
         return-value) ))
-
+    
 (define set-parameters
   (lambda (values variables classname object-calling stack env)
     (cond
@@ -306,7 +306,8 @@
 (define left-side-dot-expr
   (lambda (statement classname object-calling env)
     (cond
-      ((and (eq? 'this (left-side-of-dot statement)) (eq? 'this object-calling)) ())
+      ((and (not (atom? (left-side-of-dot statement))) (eq? 'new (operator (left-side-of-dot statement)))) (create-new-instance classname env))
+      ((and (eq? 'this (left-side-of-dot statement)) (eq? 'this object-calling)) (create-new-instance classname env))
       ((eq? 'this (left-side-of-dot statement)) (lookup-in-working-env object-calling env))
       (else (lookup-in-working-env (left-side-of-dot statement) env)))))
 
@@ -316,4 +317,12 @@
       ((contains-in-working-env statement env) (lookup-in-working-env statement env))
       ((contains-in-class statement classname env) (lookup-in-class statement classname env) )
       (else (error "variable does not exist")))))
+
+;when making function calls from within a function, this function correctly chooses whether this or a given object is what is calling the function
+(define correct-object-calling
+  (lambda (statement-ob passed-ob)
+    (cond
+      ((eq? statement-ob passed-ob) statement-ob)
+      ((and (eq? 'this statement-ob) (not (eq? 'this passed-ob))) passed-ob)
+      (else statement-ob) )))
 
