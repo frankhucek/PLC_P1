@@ -143,7 +143,7 @@
 (define execute-conditional
   (lambda (statement classname object-calling stack exit break cont throw)
     (cond
-      ((execute-boolean-statement (operand1 statement) classname stack throw) (execute-statement (operand2 statement) classname object-calling stack exit break cont throw)) ;if true
+      ((execute-boolean-statement (operand1 statement) classname object-calling stack throw) (execute-statement (operand2 statement) classname object-calling stack exit break cont throw)) ;if true
       ((null? (operand3 statement)) stack) ;false but no else block
       (else (execute-statement (operand3 statement) classname object-calling stack exit break cont throw))))) ;false and else block to execute
 
@@ -247,12 +247,13 @@
 (define execute-function-call
   (lambda (statement class-name object-calling env throw)
     (let ([return-value (interpret-function (functionDefinition (proper-function statement class-name object-calling env))
+                                            ;(correct-class-name class-name object-calling)
                                             class-name
                                             (correct-object-calling (left-side-of-dot (functionName statement)) object-calling env)
                                             (cons (addStackLayer
                                                    (set-parameters
                                                     (paramsPassingIn statement) ;parameters your passing in e.g. 1, 2, 3 in foo(1, 2, 3)
-                                                    (first-statement (lookup-in-class (functionNameFromDotOperator statement) class-name env)) ;variables the values will be assigned to
+                                                    (first-statement (proper-function statement class-name object-calling env)) ;variables the values will be assigned to
                                                     class-name
                                                     (correct-object-calling (left-side-of-dot (functionName statement)) object-calling env)
                                                     (newStack)
@@ -352,9 +353,16 @@
       ((and (eq? 'super (left-side-of-dot (operand1 statement))) (matching-class-and-ob-called class-name object-calling env))
        (lookup-in-parent-class (functionNameFromDotOperator statement) class-name env))
       ((eq? 'super (left-side-of-dot (operand1 statement))) (lookup-in-parent-class (functionNameFromDotOperator statement) (operator object-calling) env)) 
-      ;(else (lookup-in-class (functionNameFromDotOperator statement) class-name env)))))
+      ((eq? 'this (left-side-of-dot (operand1 statement))) (lookup-until-found (functionNameFromDotOperator statement) class-name object-calling env))
       (else (lookup-in-correct-class (functionNameFromDotOperator statement) class-name object-calling env)))))
 
+(define lookup-until-found
+  (lambda (func-name class-name object-calling env)
+    (cond
+      ((atom? object-calling) (lookup-in-class func-name class-name env))
+      ((contains-in-class func-name class-name env) lookup-in-class func-name class-name env)
+      (else (lookup-in-parent-class func-name class-name env)))))
+       
 (define lookup-in-correct-class
   (lambda (func-name class-name object-calling env)
     (cond
@@ -374,3 +382,9 @@
       ((and (eq? 'new (operator object-calling)) (eq? (operand1 object-calling) class-name)) #t)
       ((eq? (operator object-calling) class-name) #t)
       (else #f))))
+
+(define correct-class-name
+  (lambda (class-name object-calling)
+    (cond
+      ((not (atom? object-calling)) (operator object-calling))
+      (else class-name))))
