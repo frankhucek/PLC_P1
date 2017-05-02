@@ -2,13 +2,10 @@
 (load "environment.scm")
 
 ;(addWorkingEnv (insert-class 'B '(extends A) testenv2 (insert-class 'A '() testenv1 (new-class-env))))
-(define testenv1 (box '((((main a b) ((() ((var a (new A)) (return (+ (dot a x) (dot a y))))) 15 9))))  ))
-(define testenv2 (box '((((main y x) ((() ((var a (new A)) (return (+ (dot a x) (dot a y))))) 10 5))))  ))
+(define testenv1 (box '((((main a x) ((() ((var a (new A)) (return (+ (dot a x) (dot a y))))) 15 9))))  ))
+(define testenv2 (box '((((main y x) ((() ((var a (new A)) (return (+ (dot a x) (dot a y))))) 10 20))))  ))
 (define testenv3 (box '((((main z r) ((() ((var a (new A)) (return (+ (dot a x) (dot a y))))) 10 5))))  ))
-(define test-class-env (cons '(class1 class2)
-                             (cons (cons (cons '() (cons testenv2 '()))
-                                         (cons (cons '() (cons testenv1 '())) '())
-                                         ) '())) )
+(define test-class-env (cons '(class1 class2) (cons (cons (cons '() (cons testenv2 '())) (cons (cons '() (cons testenv1 '())) '())) '())) )
 
 (define new-class-env (lambda () (cons '() (cons '() '() ))))
 (define class-names (lambda (class_env) (car class_env)))
@@ -28,12 +25,14 @@
 (define parent-class (lambda (env) (cadar (first-class-info env))))
 (define rest-of (lambda (statement) (cdr statement)))
 
+;insert a variable with a value into a working enviornment
 (define insert-in-working-env
   (lambda (var val env)
     (cond
       ((box? env) (insert var val env))
       (else (update-by-popping-off-working-env (insert var val (the-working-env env)) env)))))
-     
+
+;checks if a given variable exists in work-env
 (define contains-in-working-env
   (lambda (var env)
     (cond
@@ -46,6 +45,9 @@
       ((box? env) (update var val env))
       (else (update var val (the-working-env env))))))
 
+;updates the instance values for an instance object
+;e.g. object a is class A with isntance variables ((x y) (1 2))
+;passing in ((a x) 5 env) updates to -> ((x y) (5 2))
 (define update-instance-values
   (lambda (object-calling-and-var val env)
     (cons (update (object-calling-in-pair object-calling-and-var)
@@ -69,19 +71,23 @@
     (cons (cons class-name (class-names class-env))
           (cons (cons (cons class-parent (cons class-body '())) (class-bodies class-env)) '())) ))
 
+;checks if a var or function name exists in a class
 (define contains-in-class
   (lambda (statement classname class-env-with-working-layer)
     (contains statement (class-body-of classname (class-definitions class-env-with-working-layer)))))
-     
+
+;lookups a variable in a gievn class
 (define lookup-in-class
   (lambda (var class-name class-env-with-working-layer)
     (lookup-in-class-helper var class-name (class-definitions class-env-with-working-layer))))
 
-;after removing the working layer can just check in specific class
+;helper for after removing the working layer to just check in a specific class
 (define lookup-in-class-helper
   (lambda (var class-name env)
     (lookup var (class-body-of class-name env))))
 
+;gets the class body of a class
+;e.g. the env where the class' functions, vars were defined
 ;does NOT take env with working layer on top, pass in (class-definitions working-layer-on-top-class-env)
 (define class-body-of
   (lambda (class-name env)
@@ -105,6 +111,7 @@
     (and (contains function-name (class-body-of class-name (class-definitions class-env-with-working-layer)))
           (not (containsInState function-name (class-instance-fields class-name class-env-with-working-layer))))))
 
+;gets the parent class of a class
 (define parent-class-of
   (lambda (class-name env-with-working-layer)
     (parent-class-of-helper class-name (class-definitions env-with-working-layer))))
@@ -119,6 +126,7 @@
                                  (cons (rest-of (class-bodies env))
                                        '())))))))
 
+;checks if a statement variable exists in any parent classes in the above hierarchy
 (define contains-in-parent-class
   (lambda (statement classname env)
     (contains-in-parent-class-helper statement
@@ -133,7 +141,8 @@
       (else (contains-in-parent-class-helper statement
                                       (parent-class-of-helper classname env)
                                       env)))))
-  
+
+;gets a statement variable if it exists in the first parent classes in the above hierarchy that has said variable
 (define lookup-in-parent-class
   (lambda (statement classname env)
     (lookup-in-parent-class-helper statement
