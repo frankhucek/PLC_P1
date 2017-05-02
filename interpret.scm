@@ -243,7 +243,7 @@
 (define handle-function-call
   (lambda (statement classname object-calling env throw)
     (execute-function-call statement
-                           (class-type-from-left-side (left-side-dot-expr (functionName statement) classname object-calling env))
+                           classname
                            object-calling
                            env
                            throw) ))
@@ -258,7 +258,7 @@
                                                     (paramsPassingIn statement) ;parameters your passing in e.g. 1, 2, 3 in foo(1, 2, 3)
                                                     (first-statement (lookup-in-class (functionNameFromDotOperator statement) class-name env)) ;variables the values will be assigned to
                                                     class-name
-                                                    object-calling
+                                                    (correct-object-calling (left-side-of-dot (functionName statement)) object-calling)
                                                     (newStack)
                                                     env
                                                     )
@@ -308,14 +308,17 @@
     (cond
       ((and (not (atom? (left-side-of-dot statement))) (eq? 'new (operator (left-side-of-dot statement)))) (create-new-instance classname env))
       ((and (eq? 'this (left-side-of-dot statement)) (eq? 'this object-calling)) (create-new-instance classname env))
-      ((eq? 'this (left-side-of-dot statement)) (lookup-in-working-env object-calling env))
+      ((eq? 'this (left-side-of-dot statement)) (handle-dot-operator-with-this classname object-calling (left-side-of-dot statement) env))
+      ;((eq? 'this (left-side-of-dot statement)) (lookup-in-working-env (correct-for-super classname object-calling) env))
+      ((eq? 'super (left-side-of-dot statement)) (create-new-instance (get-parent-class classname env) env))
       (else (lookup-in-working-env (left-side-of-dot statement) env)))))
 
 (define variable-lookup
   (lambda (statement classname env)
     (cond
       ((contains-in-working-env statement env) (lookup-in-working-env statement env))
-      ((contains-in-class statement classname env) (lookup-in-class statement classname env) )
+      ((contains-in-class statement classname env) (lookup-in-class statement classname env))
+      ((contains-in-parent-class statement classname env) (lookup-in-parent-class statement classname env))
       (else (error "variable does not exist")))))
 
 ;when making function calls from within a function, this function correctly chooses whether this or a given object is what is calling the function
@@ -326,3 +329,19 @@
       ((and (eq? 'this statement-ob) (and (not (eq? 'this passed-ob)) (not (eq? 'classname passed-ob)))) passed-ob)
       (else statement-ob) )))
 
+(define correct-for-super
+  (lambda (classname object-calling)
+    (cond
+      ((eq? 'super object-calling) classname)
+      (else object-calling))))
+    
+(define get-parent-class
+  (lambda (classname env)
+    (parent-class-of classname env)))
+
+(define handle-dot-operator-with-this
+  (lambda (classname object-calling statement env)
+    (cond
+      ((contains-in-working-env (correct-for-super classname object-calling) env) (lookup-in-working-env (correct-for-super classname object-calling) env))
+      ((and (eq? 'this statement) (and (not (eq? 'super object-calling)) (not (eq? 'this object-calling)))) (lookup-in-working-env (correct-for-super classname object-calling) env))
+      (else (create-new-instance classname env)))))
