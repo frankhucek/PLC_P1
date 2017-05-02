@@ -242,11 +242,7 @@
 ;passed in (funcall (dot x foobar) 10 12) where 10 and 12 are parameters passed into function foobar called from class x
 (define handle-function-call
   (lambda (statement classname object-calling env throw)
-    (execute-function-call statement
-                           classname
-                           object-calling
-                           env
-                           throw) ))
+    (execute-function-call statement classname object-calling env throw)))
   
 (define execute-function-call
   (lambda (statement class-name object-calling env throw)
