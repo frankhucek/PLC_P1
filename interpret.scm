@@ -246,15 +246,15 @@
   
 (define execute-function-call
   (lambda (statement class-name object-calling env throw)
-    (let ([return-value (interpret-function (functionDefinition (lookup-in-class (functionNameFromDotOperator statement) class-name env))
+    (let ([return-value (interpret-function (functionDefinition (proper-function statement class-name object-calling env))
                                             class-name
-                                            (correct-object-calling (left-side-of-dot (functionName statement)) object-calling)
+                                            (correct-object-calling (left-side-of-dot (functionName statement)) object-calling env)
                                             (cons (addStackLayer
                                                    (set-parameters
                                                     (paramsPassingIn statement) ;parameters your passing in e.g. 1, 2, 3 in foo(1, 2, 3)
                                                     (first-statement (lookup-in-class (functionNameFromDotOperator statement) class-name env)) ;variables the values will be assigned to
                                                     class-name
-                                                    (correct-object-calling (left-side-of-dot (functionName statement)) object-calling)
+                                                    (correct-object-calling (left-side-of-dot (functionName statement)) object-calling env)
                                                     (newStack)
                                                     env
                                                     )
@@ -309,6 +309,7 @@
       ((eq? 'super (left-side-of-dot statement)) (create-new-instance (get-parent-class classname env) env))
       (else (lookup-in-working-env (left-side-of-dot statement) env)))))
 
+;looks up the proper variable at the given scope
 (define variable-lookup
   (lambda (statement classname env)
     (cond
@@ -319,12 +320,14 @@
 
 ;when making function calls from within a function, this function correctly chooses whether this or a given object is what is calling the function
 (define correct-object-calling
-  (lambda (statement-ob passed-ob)
+  (lambda (statement-ob passed-ob env)
     (cond
       ((eq? statement-ob passed-ob) statement-ob)
       ((and (eq? 'this statement-ob) (and (not (eq? 'this passed-ob)) (not (eq? 'classname passed-ob)))) passed-ob)
+      ((eq? 'super statement-ob) (get-instance-of-parent-class passed-ob env))
       (else statement-ob) )))
 
+;if a object that was passed is referred to as 'super', correct this to use the classname passed in 
 (define correct-for-super
   (lambda (classname object-calling)
     (cond
@@ -335,9 +338,39 @@
   (lambda (classname env)
     (parent-class-of classname env)))
 
+;dot operators with the keyword this need to return the proper class/object that 'this' is referring to
 (define handle-dot-operator-with-this
   (lambda (classname object-calling statement env)
     (cond
       ((contains-in-working-env (correct-for-super classname object-calling) env) (lookup-in-working-env (correct-for-super classname object-calling) env))
       ((and (eq? 'this statement) (and (not (eq? 'super object-calling)) (not (eq? 'this object-calling)))) (lookup-in-working-env (correct-for-super classname object-calling) env))
       (else (create-new-instance classname env)))))
+
+(define proper-function
+  (lambda (statement class-name object-calling env)
+    (cond
+      ((and (eq? 'super (left-side-of-dot (operand1 statement))) (matching-class-and-ob-called class-name object-calling env))
+       (lookup-in-parent-class (functionNameFromDotOperator statement) class-name env))
+      ((eq? 'super (left-side-of-dot (operand1 statement))) (lookup-in-parent-class (functionNameFromDotOperator statement) (operator object-calling) env)) 
+      ;(else (lookup-in-class (functionNameFromDotOperator statement) class-name env)))))
+      (else (lookup-in-correct-class (functionNameFromDotOperator statement) class-name object-calling env)))))
+
+(define lookup-in-correct-class
+  (lambda (func-name class-name object-calling env)
+    (cond
+      ((atom? object-calling) (lookup-in-class func-name class-name env))
+      ((not (eq? class-name (operator object-calling))) (lookup-in-class func-name (operator object-calling) env))
+      (else (lookup-in-class func-name class-name env)))))
+
+(define get-instance-of-parent-class
+  (lambda (class env)
+    (cond
+      ((eq? 'new (operator class)) (create-new-instance (parent-class-of (operand1 class) env) env))
+      (else (create-new-instance (parent-class-of (operator class) env) env)))))
+
+(define matching-class-and-ob-called
+  (lambda (class-name object-calling env)
+    (cond
+      ((and (eq? 'new (operator object-calling)) (eq? (operand1 object-calling) class-name)) #t)
+      ((eq? (operator object-calling) class-name) #t)
+      (else #f))))
